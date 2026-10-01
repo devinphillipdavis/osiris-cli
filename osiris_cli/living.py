@@ -52,7 +52,7 @@ HELDOUT_EVERY = 5
 # actually loaded (NclmCore.scorer), so a stale copy of the model code cannot write a "current" score.
 SCORER = 2
 TRAIN_STEPS_PER_EXCHANGE = 3
-SCORE_WINDOWS = 2
+SCORE_WINDOWS = None  # held-out scoring covers the whole reply, the same bytes unigram is scored on
 HISTORY_TURNS = 12
 # One note per message: each costs ~230 tokens, and the 7B reads new tokens at ~14/s here
 # (measured 2026-10-02), so three notes alone held a reply back ~50 s. The pre-registered
@@ -364,7 +364,7 @@ class NclmCore:
         with self._otc._organism_lock:
             return int(self._model()["step"])
 
-    def _windows(self, text: str, limit: int):
+    def _windows(self, text: str, limit: Optional[int]):
         import numpy as np
         data = np.frombuffer(text.encode("utf-8", errors="ignore"), dtype=np.uint8).astype(np.int64)
         span = self._otc.ORGANISM_GEOMETRY["max_seq_len"]
@@ -373,7 +373,7 @@ class NclmCore:
             chunk = data[start:start + span]
             if len(chunk) >= 8:
                 out.append((chunk[:-1][None, :], chunk[1:][None, :]))
-            if len(out) >= limit:
+            if limit is not None and len(out) >= limit:
                 break
         return out
 
