@@ -79,3 +79,12 @@ def test_scripts_the_console_runs_by_path_are_packaged():
     assert scripts, "expected the console to run at least one script by path"
     missing = sorted(scripts - _py_modules())
     assert not missing, f"run by path from the console but not in py-modules: {missing}"
+
+
+def test_bench_tasks_ship_and_results_land_where_the_console_reads():
+    text = open(os.path.join(ROOT, "pyproject.toml"), encoding="utf-8").read()
+    assert '"bench_tasks*"' in text and '"*" = ["task.json"]' in text
+    assert not os.path.exists(os.path.join(ROOT, "bench_tasks", "__init__.py")), "would change suite_sha256"
+    import osiris_bench
+    import protege
+    assert osiris_bench.DEFAULT_OUT == protege.BENCH_DIR
