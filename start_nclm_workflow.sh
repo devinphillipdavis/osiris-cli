@@ -3,7 +3,8 @@
 
 set -e
 
-cd /root/osiris-cli
+# Run from this checkout wherever it lives (/root on Node Alpha, /home/enki on Node Beta)
+cd "$(dirname "${BASH_SOURCE[0]}")"
 
 # Set environment
 : "${OSIRIS_PG_URL:?set OSIRIS_PG_URL in your shell first}"

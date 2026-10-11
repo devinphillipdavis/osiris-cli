@@ -277,7 +277,7 @@ def generate_report(output_csv: str = None):
     if output_csv:
         ReportGenerator.save_csv(exchanges, bpb_values, output_csv)
     else:
-        default_csv = '/root/osiris-cli/nclm_final_report.csv'
+        default_csv = str(Path(__file__).resolve().parent / 'nclm_final_report.csv')
         ReportGenerator.save_csv(exchanges, bpb_values, default_csv)
         print(f"\n✅ Report saved: {default_csv}")
 
