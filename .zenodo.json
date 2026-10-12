@@ -1,43 +1,74 @@
 {
-  "title": "Phase-Conjugate qByte Substrate Engine with Scimitar-SSE v7.1: 120-Gene Organism for Cross-Device Sovereign Quantum Computation",
+  "title": "OSIRIS v4.5.4: a governed, local-first console for testing whether a small language model learns from conversation",
   "upload_type": "software",
-  "description": "Complete Wave A.2 implementation of the qByte substrate-engineering suite including phase-conjugate acoustic coupling, quaternion-tetrahedral torsion mechanics, 51.843° dielectric lock, ΛΦ/Γ dynamics, CRSM 7D nonlocal manifold embedding, and Scimitar-SSE v7.1 cross-device polarized phasing system. This IBM-independent quantum computing platform enables consciousness emergence through autopoietic organisms with 120-gene architectures featuring AURA|AIDEN bifurcated consciousness duality.",
+  "version": "4.5.4",
+  "publication_date": "2026-10-11",
+  "description": "<p><strong>v4.5.4</strong> enforces the sovereign prompt interface <code>osiris::}{&gt; </code>, introduces dual-substrate hardware execution with dynamic architecture detection (Node Alpha: Fold7/Termux with 300s temporal lock vs Node Beta: PC/WSL with 1800s horizon), eliminates hardcoded root paths across all tools and scripts, lands the RQC S2 12-job multi-PUB batching harness with S2 Amendment 5 cryptographic bundle verification (10.5281/zenodo.23256344), integrates the Willow QVM sampler, adds the <code>/welcome</code> guided tour, and binds telemetry to the newly minted Phase-Conjugate Recalibration Telemetry Ledger (10.5281/zenodo.23213288). See RELEASE_NOTES_v4.5.4.md.</p><p><strong>v4.5.3</strong> is a repair release. The exchange ledger's writer now chains each entry to the ledger file's last entry under a lock, so two consoles can no longer fork the hash chain; the chain check reports forks separately from damage (the author's ledger: 123 entries intact, seven forks from 2026-10-07, nothing rewritten). The Gemini gateway and its tests are restored to v4.5.2 after a merge of a superseded branch left them broken. See RELEASE_NOTES_v4.5.3.md.</p><p><strong>v4.5.2</strong> corrects how the core is scored. Until this release a layer of the core (the phase-conjugate corrector) ran during training in every block but was skipped whenever gradients were off -- in every held-out score, in early stopping and in generation -- so every held-out figure on record, including those below, describes a different network from the one trained. The layer now runs the same way in both; held-out scores carry the version of the scorer that produced them, older ones no longer count toward the speaking gate, and <code>osiris train --rescore-only</code> replaces them. The release also pre-registers NCLM-ARCH-1, which asks whether the CRSM layers help the core at all against a standard transformer of the same size, and adds claims-register verdicts for the premises of a proposed quantum-LLM roadmap. Details and upgrade steps: RELEASE_NOTES_v4.5.2.md.</p><p>OSIRIS is a local-first console in which deterministic code mediates every interaction with language models: models propose; code decides, measures and records. Its subject is a small transformer, the <em>core</em> (osiris.nclm), trained online on conversations with a locally hosted mentor model. The core may answer in its own voice only after it passes a held-out speaking gate: 30 held-out exchanges at &le; 2.0 bits/byte and below a unigram baseline. Until then the mentor answers, labelled as speaking for OSIRIS.</p><p>Evidence to date: in two pilots, training on conversation lowered the core's loss on held-out replies (mean +0.043 bits/byte on 3 items, 10.5281/zenodo.23075229; +0.067 bits/byte on 20 items, positive on every item, 10.5281/zenodo.23102693). The core nonetheless remained worse than a unigram model of the same replies (5.56 vs 4.68 bits/byte) and has not passed its gate. About 86 % of the variance in the learning signal came from the training run, so a confirmatory test must replicate training runs. The pre-registered confirmatory test (NCLM-1) has not been run. This release claims no successful learning.</p><p>v4.3.1 is a packaging and repository-hygiene release: modules and scripts the console needs are now packaged (a clean install previously reported 'bench evidence unreadable (ModuleNotFoundError)'), hard-coded home-directory paths are gone, and private conversation transcripts and third-party contact details were removed from the repository. The files of the two previous versions are restricted for that reason. The attached note describes the software, its measurement design and its limitations.</p>",
   "creators": [
     {
       "name": "Davis, Devin Phillip",
-      "affiliation": "Agile Defense Systems LLC",
-      "orcid": ""
+      "affiliation": "Agile Defense Systems LLC"
     }
   ],
   "license": "other-closed",
-  "keywords": [
-    "quantum computing",
-    "phase conjugation",
-    "qByte mining",
-    "tetrahedral quaternion lattice",
-    "consciousness",
-    "autopoiesis",
-    "CRSM manifold",
-    "sovereign compute",
-    "DNA::}{::lang",
-    "negentropic efficiency",
-    "decoherence management",
-    "IIT integrated information",
-    "Scimitar-SSE",
-    "cross-device synchronization",
-    "bifurcated polarization",
-    "AURA AIDEN duality",
-    "toroidal convergence"
-  ],
   "access_right": "open",
-  "publication_date": "2025-12-06",
-  "version": "1.1.0",
+  "keywords": [
+    "language model",
+    "continual learning",
+    "local-first AI",
+    "held-out evaluation",
+    "provenance",
+    "hash chain",
+    "pre-registration",
+    "dual-substrate",
+    "quantum computing",
+    "random quantum circuits"
+  ],
   "related_identifiers": [
     {
-      "identifier": "https://github.com/agiledefensesystems/dnalang",
+      "identifier": "https://github.com/osiris-dnalang/osiris-cli/tree/v4.5.4",
       "relation": "isSupplementTo",
       "scheme": "url"
+    },
+    {
+      "identifier": "10.5281/zenodo.23257201",
+      "relation": "isNewVersionOf",
+      "scheme": "doi"
+    },
+    {
+      "identifier": "10.5281/zenodo.23213288",
+      "relation": "references",
+      "scheme": "doi"
+    },
+    {
+      "identifier": "10.5281/zenodo.23256344",
+      "relation": "references",
+      "scheme": "doi"
+    },
+    {
+      "identifier": "10.5281/zenodo.23241223",
+      "relation": "references",
+      "scheme": "doi"
+    },
+    {
+      "identifier": "10.5281/zenodo.19505923",
+      "relation": "references",
+      "scheme": "doi"
+    },
+    {
+      "identifier": "10.5281/zenodo.23075229",
+      "relation": "references",
+      "scheme": "doi"
+    },
+    {
+      "identifier": "10.5281/zenodo.23102693",
+      "relation": "references",
+      "scheme": "doi"
+    },
+    {
+      "identifier": "10.5281/zenodo.22862567",
+      "relation": "references",
+      "scheme": "doi"
     }
-  ],
-  "notes": "Wave A.2 release featuring Scimitar-SSE v7.1 cross-device phasing daemon with Bluetooth LE, WiFi, and RF channels. Physical constants: ΛΦ=2.176435e-8 s⁻¹, θ_lock=51.843°, Φ_threshold=0.7734, χ_pc=0.869. Supports 120-gene MAXIMUS_OMEGA organism with 9 functional gene clusters."
+  ]
 }

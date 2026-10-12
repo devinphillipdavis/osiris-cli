@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "osiris-cli"
-version = "4.0.0"
-description = "OSIRIS Autonomous Quantum Discovery System — Phase-Conjugate qByte Substrate Engine + DNA::}{::lang NCLM + Full Agent Constellation + 11D-CRSM"
+version = "4.5.4"
+description = "OSIRIS: a governed local console for a living language model that learns from every conversation and speaks only after passing a held-out gate"
 readme = "README.md"
 license = {text = "LicenseRef-OSIRIS-Dual-v1.0"}
 requires-python = ">=3.9"
@@ -13,19 +13,12 @@ authors = [
     {name = "Devin Phillip Davis", email = "devin@agiledefensesystems.com"},
 ]
 keywords = [
-    "quantum-computing",
-    "phase-conjugation",
-    "qbyte",
-    "autonomous-discovery",
-    "sovereign-compute",
+    "language-model",
+    "continual-learning",
+    "local-first",
+    "provenance",
     "dna-lang",
     "nclm",
-    "consciousness",
-    "genetic-evolution",
-    "swarm-intelligence",
-    "crsm-manifold",
-    "agent-constellation",
-    "tesseract-decoder",
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -67,20 +60,29 @@ forge = [
 all = [
     "osiris-cli[quantum,tui,plot,forge]",
 ]
+# The sibling research repos (optional; the console guards every import of them).
+research = [
+    "dnalang @ git+https://github.com/osiris-dnalang/dnalang-core.git",
+    "organism_sim @ git+https://github.com/osiris-dnalang/organism_sim.git",
+    "aegis-bridge @ git+https://github.com/osiris-dnalang/bridge.git",
+]
 dev = [
     "pytest>=7.0",
     "pytest-cov>=4.0",
     "ruff>=0.4.0",
 ]
 
+[project.scripts]
+osiris = "osiris_cli.osiris_repl:main"
+
 [project.urls]
 Homepage = "https://github.com/osiris-dnalang/osiris-cli"
 Repository = "https://github.com/osiris-dnalang/osiris-cli"
 Issues = "https://github.com/osiris-dnalang/osiris-cli/issues"
+
 [tool.setuptools]
 py-modules = [
     "osiris_launcher",
-    "osiris_cli",
     "osiris_livlm",
     "osiris_ncllm_swarm",
     "osiris_ultra_coder",
@@ -118,10 +120,58 @@ py-modules = [
     "osiris_agents",
     "osiris_applications",
     "osiris_master_prompt",
+    "osiris_zerosum_microvm",
+    "osiris_quantum_bridge",
+    "osiris_hardware_mesh",
+    "osiris_swarm_governance",
+    "omega_recursive_engine",
+    "k8_preregistration",
+    "osiris_unified_livlm",
+    "osiris_comparative_benchmark",
+    "osiris_termux_console",
+    "osiris_ui",
+    "intent_router",
+    "db_ledger",
+    "experiments",
+    "gaps",
+    "gemini_bridge",
+    "genome",
+    "genome_ledger",
+    "osiris_ast_bridge",
+    "payload_gate",
+    "research",
+    "run_record",
+    "session_state",
+    "sprint_manager",
+    "structured_proposal",
+    "verify_loop",
+    "vision_indexer",
+    # Console modules and scripts that were imported or run but never packaged before 4.3.1
+    "algorithmic_dd_generator",
+    "bench_trial",
+    "capabilities",
+    "dd_sim",
+    "discover",
+    "dna_lang",
+    "evolve",
+    "nclm_aer_evaluator",
+    "osiris_bench",
+    "osiris_local_qvm",
+    "paste_digest",
+    "pretrain_nclm",
+    "prompt_strategies",
+    "protege",
+    "trials",
+    "verify_ledger",
 ]
 
 [tool.setuptools.packages.find]
-include = ["osiris*", "nclm*", "qbyte_system*", "quantum_discovery*", "scimitar_sse*"]
+include = ["osiris*", "osiris_cli*", "nclm*", "qbyte_system*", "quantum_discovery*", "scimitar_sse*", "bench_tasks", "rqc*"]
+namespaces = true   # bench_tasks has no __init__.py: a .py there would change osiris_bench.suite_sha256
+
+[tool.setuptools.package-data]
+# the benchmark task definitions are data the console and osiris_bench read from <site-packages>/bench_tasks
+bench_tasks = ["*/*", "*/*/*"]
 
 [tool.ruff]
 target-version = "py39"
