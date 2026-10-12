@@ -883,7 +883,9 @@ class TestSovereignMechanics:
         fired = self._corrector_fired(monkeypatch)
         model = self._live_like_v2(seed=13)
         x = (np.arange(24, dtype=np.int64) * 5 % 256).reshape(1, 24)
-        gc.collect()
+        for _ in range(5):
+            if gc.collect() == 0:
+                break
         gc.disable()
         try:
             with no_grad():

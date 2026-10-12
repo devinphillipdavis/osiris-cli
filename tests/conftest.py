@@ -10,3 +10,11 @@ import os
 
 if os.environ.get("OSIRIS_TEST_LIVE_OLLAMA") != "1":
     os.environ["OLLAMA_HOST"] = "http://127.0.0.1:9"      # discard port: connection refused at once
+
+# Provide backward compatibility for fake Heron backend if not exported by runtime
+try:
+    import qiskit_ibm_runtime.fake_provider as _fp
+    if not hasattr(_fp, "FakeKingston") and hasattr(_fp, "FakeMarrakesh"):
+        _fp.FakeKingston = _fp.FakeMarrakesh
+except ImportError:
+    pass

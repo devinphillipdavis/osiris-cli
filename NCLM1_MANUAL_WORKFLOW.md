@@ -14,7 +14,7 @@ You interact with OSIRIS manually. The memory engine and analysis pipeline work 
 ## Step 1: Start OSIRIS with Memory Enabled
 
 ```bash
-cd /root/osiris-cli
+cd ~/osiris-cli   # this checkout: /root on Node Alpha, /home/enki on Node Beta
 export OSIRIS_PG_URL='<your Neon connection string>'
 export OSIRIS_QUANTUM_BACKEND=aer
 osiris
@@ -57,7 +57,7 @@ Type research questions about quantum computing, geometric algebra, and continuo
 
 ```bash
 # Real-time monitoring (updates every 30 seconds)
-cd /root/osiris-cli
+cd ~/osiris-cli   # this checkout: /root on Node Alpha, /home/enki on Node Beta
 python3 nclm_analysis.py --watch
 
 # Or check status once
