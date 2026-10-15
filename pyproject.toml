@@ -57,6 +57,14 @@ forge = [
     "paho-mqtt>=1.6.0",
     "zeroconf>=0.80.0",
 ]
+# The olmo3-embed-7b evidence retrieval backend (osiris_cli/retrieval). Its model files were
+# saved with sentence-transformers 5.7 and transformers 5.18, which need Python 3.10+;
+# loading, scoring and checking capsules work on 3.9 without them.
+retrieval = [
+    "torch>=2.4",
+    "sentence-transformers>=5.7",
+    "transformers>=5.0",
+]
 all = [
     "osiris-cli[quantum,tui,plot,forge]",
 ]

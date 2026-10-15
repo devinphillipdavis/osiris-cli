@@ -71,6 +71,8 @@ LAYERS = (
     Layer("L6", "Benchmark", (
         ("bench ledger with hashed artifacts", "protege.py · /bench · /mentors"),
         ("paired pre/post scoring of the core on held-out exchanges", "osiris_cli/prepost.py"),
+        ("embedding retrieval on SciFact: nDCG@10 against the model card, evidence capsules",
+         "osiris_cli/retrieval · /retrieval"),
     ), ("calibration: stated confidence against measured correctness",)),
     Layer("L7", "Promote", (
         ("speaking gate: the core answers only after earning it on held-out text", "living.Osiris.gate"),
@@ -87,6 +89,7 @@ SUBSYSTEMS = (
     ("Physics research", (
         ("bounds checks on a claimed number", "/physics"),
         ("claim verdicts with their evidence", "/legit"),
+        ("abstracts ranked as evidence candidates for a claim (no verdict)", "/retrieval query"),
     ), ("formal model builder (variables, units, symmetries)", "prediction against the standard-theory value")),
     ("Quantum research", (
         ("simulator-first experiment brief", "/experiment"),

@@ -1273,6 +1273,8 @@ def display_help() -> None:
     print("    /legit <text|ID|list> Is a claim legit? Verdicts from the claims register, with evidence")
     print("    /gemini [--dry] <q>  Ask Gemini directly (advisory; redacted, budgeted, ledgered)")
     print("    /physics <check> k=v  Physics bounds: thrust, rim, metric, chsh, efficiency, entropy, dd")
+    print("    /retrieval [status|load-scifact|build-index|run|evaluate|capsule|verify|query|unload]")
+    print("                         olmo3-embed-7b evidence retrieval over SciFact (ranks evidence; no verdicts)")
     print("    /train [start H|stop|rescore] Overnight batch training (status by default)")
     print()
     print("  \033[1;36mCore Substrate\033[0m")
@@ -1570,6 +1572,9 @@ def dispatch_command(state: OsirisReplState, line: str) -> None:
     elif cmd == "/physics":
         from osiris_cli import physics_checks
         print("\n" + physics_checks.run_command(line_clean[len(parts[0]):].strip()) + "\n")
+    elif cmd == "/retrieval":
+        from osiris_cli import retrieval
+        print("\n" + retrieval.run_command(line_clean[len(parts[0]):].strip()) + "\n")
     elif cmd == "/check":
         living = get_living()
         names = [p for p in parts[1:] if p in ("trainer", "git", "ledger", "system", "evidence")] or \
@@ -1681,6 +1686,9 @@ def main(argv: Optional[List[str]] = None) -> None:
         from osiris_cli import train as osiris_train
         osiris_train.main(argv[1:])
         return
+    if argv and argv[0] in ("retrieval", "/retrieval"):
+        from osiris_cli import retrieval
+        sys.exit(retrieval.main(argv[1:]))
 
     parser = argparse.ArgumentParser(
         prog="osiris",
