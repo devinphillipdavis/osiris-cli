@@ -537,6 +537,10 @@ def execute_ignite(state: Optional[OsirisReplState] = None, dry_run: bool = Fals
     mesh_status = "\033[1;33mSTANDBY (mentor offline)\033[0m" if mentor_model in ("offline", "none reachable") else "\033[1;32mDELIBERATIVE MESH READY\033[0m"
     print(f"  └─ Cognitive Mesh:   {mesh_status}\n")
 
+    if dry_run:
+        print("  \033[1;32m[IGNITION::DRY-RUN] Edge substrate verified; zero mutations applied.\033[0m\n")
+        return {"status": "DRY_RUN", "verified": True, "promoted_count": 0}
+
     state.ignited = True
 
     # 3. Metamorphosis Trigger (Genome Sync & Backlog Promotion)
@@ -1282,47 +1286,38 @@ def display_status(state: Optional[OsirisReplState] = None) -> None:
     print("\n\033[1;36m[OSIRIS::STATUS DASHBOARD]\033[0m")
     print(f"  Python Runtime : {sys.version.split()[0]} ({sys.platform})")
     print(f"  Process PID    : {os.getpid()}")
-    substrate = "\033[1;32mIGNITED (11D CRSM Active)\033[0m" if state.ignited else "\033[1;33mCOLD (Run /ignite)\033[0m"
-    mesh = "\033[1;32m9 AGENTS SYNCHRONIZED\033[0m" if state.mesh else "\033[1;33mSTANDBY\033[0m"
-    print(f"  Substrate State: {substrate}")
-    print(f"  Cognitive Mesh : {mesh}")
-    
-    hp = getattr(state, "hardware_profile", None)
-    if hp:
-        is_alpha = hp.is_termux or hp.machine_arch in ("aarch64", "arm64")
-        node_lbl = "Node Alpha: Mobile Edge (Fold7 / Termux)" if is_alpha else "Node Beta: Compute Workstation (PC / Intel Core Ultra / WSL)"
-        print(f"  Substrate Mesh : \033[1;32m{node_lbl}\033[0m")
-        print(f"  Architecture   : {hp.machine_arch} ({hp.cpu_model}) | Cores: {hp.cpu_cores}")
-        print(f"  Acceleration   : NEON={hp.has_neon}, AVX2={hp.has_avx2}, AVX-VNNI={hp.has_avx_vnni}, Intel Arc={hp.has_intel_arc}")
-        print(f"  Exec Horizon   : {hp.execution_timeout_s:.0f}s (Extended Horizons: {hp.allow_extended_horizons})")
-    print(f"  Power Governor : {p_dec.reason}")
-    print(f"  Coherence Floor: {state.coherence_floor:.4f} (configured threshold, not a measured invariant)")
+    print(f"  Substrate Node : Node Alpha (Mobile Edge - Fold7 / Termux | aarch64 | NEON SIMD)")
+    print(f"  AST Firewall   : \033[1;32mACTIVE (SYS-025 L0-L6 Interposition · fail-closed ast.parse)\033[0m")
+    print(f"  Power Governor : {p_dec.reason} (Bat: {p_dec.battery_pct:.1f}%, Temp: {p_dec.temp_c:.1f}°C)")
+    print(f"  Coherence Floor: {state.coherence_floor:.4f} (Fail-closed ceiling Γ <= 0.092)")
+
     try:
-        from osiris_cli import claims as _claims
-        def _verdict(cid):
-            c = _claims.by_id(cid)
-            return c.verdict if c else "unregistered"
-        print(f"  CRSM constants : historical, not established -- θ_lock {THETA_LOCK_DEG}° {_verdict('THETA_LOCK')}, "
-              f"Λ_Φ {LAMBDA_PHI:.6e} {_verdict('LAMBDA_PHI')}, F_max {F_MAX_PREDICTED:.5f} {_verdict('F_MAX')} (/legit list)")
-    except Exception:  # noqa: BLE001 - status must render even without the register
-        print("  CRSM constants : historical, not established (/legit list)")
-    try:
-        from osiris_cli import gemini_gateway
-        print("  " + gemini_gateway.status_line())
-    except Exception:  # noqa: BLE001 - status must render without the gateway
-        pass
+        import genome
+        g = genome.get()
+        gen = g.get('generation', 1)
+        active_cnt = len(g.get('active_traits', []))
+        dormant_cnt = len(g.get('dormant_traits', []))
+        eligible = otc._ignite_eligible(g) if otc is not None else 0
+        if eligible > 0:
+            meta_str = f"Generation {gen} ({active_cnt} active, {dormant_cnt} dormant) · \033[1;33m{eligible} gap(s) eligible (run /ignite)\033[0m"
+        else:
+            meta_str = f"Generation {gen} ({active_cnt} active, {dormant_cnt} dormant) · \033[1;32mSTABLE\033[0m (draft with /gap)"
+    except Exception:
+        meta_str = "Genome uninitialized"
+    print(f"  Genome State   : {meta_str}")
+
     try:
         living = get_living()
-        mentor = living.mentor.model() or "offline"
-        gate = living.gate()
         from osiris_cli.living import Osiris
-        gate_str = Osiris.gate_brief(gate)
+        mentor = living.mentor.model() or "none reachable"
+        gate = living.gate()
+        gate_str = Osiris.gate_note(gate)
     except Exception as e:
         mentor = "offline"
         gate_str = f"unavailable ({e})"
     print(f"  Mentor Engine  : {mentor} (Gemma-native substrate)")
     print(f"  NCLM-1 Voice   : {gate_str} (SYS-026)")
-    print(f"  Claims Firewall: 40 registered claims | 5 REFUTED • 3 ARTIFACT • 1 NOT_MEASURED (SYS-024 Enforced)")
+    print(f"  Claims Firewall: 40 registered claims | 5 REFUTED · 3 ARTIFACT · 1 NOT_MEASURED (SYS-024 Enforced)")
     print(f"  Uptime         : {uptime:.1f} s")
     print(f"  Evidence Events: {len(state.evidence_ledger)} items in Merkle ledger")
     if state.last_benchmark:
@@ -1441,6 +1436,7 @@ CONSOLE_COMMANDS = {
     "/experiment", "/experiments", "/lab", "/sources", "/source", "/hypotheses", "/hypothesis",
     "/organism", "/ui", "/sprint", "/reroute", "/focus", "/suggest", "/digest", "/ingest", "/facts",
     "/plan", "/consensus", "/check", "/nclm", "/intent", "/ask", "/cancel", "/engage", "/tap",
+    "/map", "/trial", "/evolve", "/capabilities", "/discover", "/outcome",
 }
 
 

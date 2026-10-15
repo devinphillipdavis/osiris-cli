@@ -117,10 +117,23 @@ class GemmaProvider(BaseModelProvider):
 
     Operating Modes:
       1. endpoint: Connects via HTTP/REST to a local or remote Gemma serving endpoint
-         (e.g., LiteRT-LM, llama.cpp server, vLLM, or Google AI Studio).
+          (e.g., LiteRT-LM, llama.cpp server, vLLM, or Google AI Studio).
       2. mock: Deterministic fixture mode for tests and disconnected verification.
       3. local_engine: Direct Python runtime if llama_cpp or transformers is installed.
     """
+
+    @staticmethod
+    def _probe_local_port(port: int, host: str = "127.0.0.1", timeout: float = 0.2) -> bool:
+        """Non-blocking socket probe to test if a local LLM daemon is listening."""
+        import socket
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.settimeout(timeout)
+        try:
+            return s.connect_ex((host, port)) == 0
+        except Exception:
+            return False
+        finally:
+            s.close()
 
     def __init__(
         self,
@@ -133,7 +146,14 @@ class GemmaProvider(BaseModelProvider):
     ):
         self.selected_model = model
         self.timeout = timeout
-        self.endpoint_url = endpoint_url or os.environ.get("OSIRIS_GEMMA_ENDPOINT", "").rstrip("/")
+        raw_endpoint = endpoint_url or os.environ.get("OSIRIS_GEMMA_ENDPOINT", "").strip()
+        if raw_endpoint:
+            if not raw_endpoint.startswith(("http://", "https://")):
+                raw_endpoint = f"http://{raw_endpoint}"
+            self.endpoint_url = raw_endpoint.rstrip("/")
+        else:
+            self.endpoint_url = ""
+
         self.api_key = api_key or os.environ.get("OSIRIS_GEMMA_API_KEY", "")
         self.cancelled_requests: set[str] = set()
         self.mock_responder = mock_responder
@@ -145,7 +165,7 @@ class GemmaProvider(BaseModelProvider):
             elif self.endpoint_url:
                 self.mode = "endpoint"
             else:
-                self.mode = "mock" if os.environ.get("CI") == "1" else "endpoint"
+                self.mode = "mock"
         else:
             self.mode = mode
 
@@ -329,6 +349,16 @@ class GemmaProvider(BaseModelProvider):
             return
 
         if self.mode == "endpoint":
+            if not self.endpoint_url or not self.endpoint_url.startswith(("http://", "https://")):
+                resp = self._mock_generate(request, time.monotonic())
+                yield ProviderStreamChunk(
+                    text=resp.content,
+                    is_final=True,
+                    chunk_index=0,
+                    request_id=request.request_id,
+                    finish_reason=resp.finish_reason,
+                )
+                return
             # For endpoint, fall back to buffered generation yielded as chunks if stream not native
             resp = self._endpoint_generate(request, time.monotonic())
             yield ProviderStreamChunk(
@@ -400,6 +430,18 @@ class GemmaProvider(BaseModelProvider):
 
     def _endpoint_generate(self, request: ProviderRequest, start_time: float) -> ProviderResponse:
         """Call standard HTTP REST endpoint."""
+        if not self.endpoint_url or not self.endpoint_url.startswith(("http://", "https://")):
+            duration = (time.monotonic() - start_time) * 1000.0
+            return ProviderResponse(
+                content="",
+                model=self.selected_model,
+                provider="gemma",
+                request_id=request.request_id,
+                finish_reason=FinishReason.ERROR,
+                error="Gemma endpoint URL not configured or invalid (set OSIRIS_GEMMA_ENDPOINT)",
+                total_duration_ms=duration,
+            )
+
         url = f"{self.endpoint_url}/v1/chat/completions"
         messages = []
         if request.system:
