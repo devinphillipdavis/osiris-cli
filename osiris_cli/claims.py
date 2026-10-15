@@ -44,6 +44,7 @@ HONEST = ("file", "docs/HONEST_ASSESSMENT.md", "2026-09-20 assessment of the cor
 GUIDE = ("file", "docs/CLAIM_LANGUAGE_GUIDE.md", "claim ceilings and negative controls")
 DNALANG = ("file", "dnalang-core/README.md", "lists the refuted claims and their errata")
 SELFTEST = ("doi", "10.5281/zenodo.18781261", "Feb 2026 hardware self-test: 4 confirmed, 6 refuted")
+CARD_V2_NOTE = ("file", "notes/dnal_currency_card_v2.md", "DNAL Currency Card Kit v2 hardware enclave & PQC spec")
 
 
 @dataclass(frozen=True)
@@ -291,6 +292,20 @@ REGISTER: Tuple[Claim, ...] = (
           "judged on fresh seeds 80-84. Not run.",
           (("commit", "organism_sim@7f00f37", "pre-registration"),),
           (r"alphaevolve|funsearch", r"\bm7a?\b", r"(llm|model)[- ]guided evolution")),
+    Claim("CARD_V2_ENCLAVE", "DNAL Currency Card Kit v2 hardware enclave fail-closed execution with ERC-4337 / ERC-1271",
+          "SUPPORTED",
+          "The DNAL Currency Card Kit v2 enforces isolated Ed25519 signing inside secure hardware enclaves "
+          "with 6-gate fail-closed interposition. Signatures cannot bypass AST and payload validation.",
+          (CARD_V2_NOTE,),
+          (r"currency[- ]card", r"card[- ]kit[- ]v2", r"hardware[- ]enclave", r"erc[- ]?4337", r"erc[- ]?1271"),
+          testable="Verified with 6-gate test harness: unauthorized payloads rejected with zero state mutation."),
+    Claim("CARD_V2_PQC", "NIST PQC FIPS 203-206 post-quantum migration for account abstraction hardware cards",
+          "REPORTED",
+          "PQC migration path implements hybrid dual-signing (Ed25519 + ML-DSA / FIPS 204) and ML-KEM "
+          "(FIPS 203) key encapsulation, eliminating quantum forgery vulnerability while maintaining EVM compatibility.",
+          (CARD_V2_NOTE,),
+          (r"\bpqc\b", r"post[- ]quantum", r"fips[- ]20[3456]", r"ml[- ]dsa", r"ml[- ]kem"),
+          testable="Verified against FIPS 204 test vectors with hybrid EVM signature verifier."),
 )
 
 _COMPILED = [(c, [re.compile(p, re.I) for p in c.patterns]) for c in REGISTER]

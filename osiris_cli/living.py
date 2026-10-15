@@ -504,7 +504,13 @@ class Osiris:
         self.small_talk = small_talk   # True for a message that is only a greeting or thanks
         self.claims_register = claims_register
         self._claims_hit: list = []
-        self.mentor = mentor or OllamaMentor()
+        if mentor is None:
+            try:
+                from osiris_cli.providers import ProviderMentorAdapter
+                mentor = ProviderMentorAdapter()
+            except Exception:
+                mentor = OllamaMentor()
+        self.mentor = mentor
         self.home = home
         self.out = out or (lambda s: print(s, end="", flush=True))
         self.background = background
@@ -691,8 +697,9 @@ class Osiris:
         if voice is None:
             model = self.mentor.model()
             if model is None:
+                base_info = getattr(self.mentor, "base", "configured provider")
                 self.out("\nOSIRIS › I can't answer yet: my core hasn't earned its own voice and no "
-                         f"mentor model is reachable at {self.mentor.base}. Start one with `ollama serve`.\n")
+                         f"mentor model is reachable at {base_info}. Configure Gemma or start Ollama (`ollama serve`).\n")
                 self.history.pop()
                 return ""
             fast = getattr(self.mentor, "fast_model", lambda: None)()

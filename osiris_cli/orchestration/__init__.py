@@ -29,6 +29,13 @@ from .schemas import (
     VerificationResult,
 )
 
+from .critic_verifier import IndependentCriticVerifier
+from .evidence_provenance import EvidenceProvenanceRegistry, ProvenanceRecord
+from .intent_router import IntentRouter, IntentRoutingDecision, RiskTier
+from .multi_candidate import CandidateStrategy, MultiCandidateGenerator, MultiCandidateSet
+from .run_record import TaskRunRecord
+from .sprint_manager import SprintManager, SprintState
+
 __all__ = [
     "ArchitectAgent",
     "ImplementationAgent",
@@ -49,4 +56,16 @@ __all__ = [
     "TaskSpec",
     "VerificationReport",
     "VerificationResult",
+    "TaskRunRecord",
+    "IntentRouter",
+    "IntentRoutingDecision",
+    "RiskTier",
+    "SprintManager",
+    "SprintState",
+    "EvidenceProvenanceRegistry",
+    "ProvenanceRecord",
+    "CandidateStrategy",
+    "MultiCandidateGenerator",
+    "MultiCandidateSet",
+    "IndependentCriticVerifier",
 ]
