@@ -5210,6 +5210,7 @@ IMMEDIATE_COMMANDS = {
     "/engage", "/ui", "/help", "/mentors", "/bench", "/gaps", "/ask", "/plan", "/experiment",
     "/experiments", "/facts", "/cancel", "/reroute", "/focus", "/digest", "/lab", "/import", "/sources",
     "/source", "/map", "/hypothesis", "/hypotheses", "/outcome", "/trial", "/evolve", "/capabilities", "/discover",
+    "/pr", "/sync",
     "exit", "quit",
 }
 
@@ -5219,7 +5220,7 @@ IMMEDIATE_COMMANDS = {
 READ_ONLY_COMMANDS = {"/status", "/why", "/home", "/runs", "/runs stats", "/help", "/ui", "/mentors", "/digest",
                       "/lab", "/sources", "/map", "/hypotheses",
                       "/ui rich", "/ui plain", "/ui access", "/intent", "/intent status",
-                      "/organism", "/organism status"}
+                      "/organism", "/organism status", "/pr", "/sync"}
 
 # OSIRIS_INTENT_CARD=0 sends free-form input straight to the models, as before.
 INTENT_CARD = os.environ.get("OSIRIS_INTENT_CARD", "1") != "0"
@@ -5650,6 +5651,14 @@ def main():
                 continue
             if user_input.strip().lower() == "/consensus":
                 _consensus()
+                continue
+            if user_input.strip().lower().startswith("/pr"):
+                from osiris_cli.osiris_repl import execute_pr
+                execute_pr(user_input.strip().split()[1:])
+                continue
+            if user_input.strip().lower().startswith("/sync"):
+                from osiris_cli.osiris_repl import execute_sync
+                execute_sync(user_input.strip().split()[1:])
                 continue
             first = user_input.strip().split()[0].lower() if user_input.strip() else ""
             if first == "/ask":
