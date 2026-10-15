@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "osiris-cli"
-version = "4.3.0"
+version = "4.5.4"
 description = "OSIRIS: a governed local console for a living language model that learns from every conversation and speaks only after passing a held-out gate"
 readme = "README.md"
 license = {text = "LicenseRef-OSIRIS-Dual-v1.0"}
@@ -56,6 +56,14 @@ forge = [
     "trimesh>=4.0.0",
     "paho-mqtt>=1.6.0",
     "zeroconf>=0.80.0",
+]
+# The olmo3-embed-7b evidence retrieval backend (osiris_cli/retrieval). Its model files were
+# saved with sentence-transformers 5.7 and transformers 5.18, which need Python 3.10+;
+# loading, scoring and checking capsules work on 3.9 without them.
+retrieval = [
+    "torch>=2.4",
+    "sentence-transformers>=5.7",
+    "transformers>=5.0",
 ]
 all = [
     "osiris-cli[quantum,tui,plot,forge]",
@@ -146,10 +154,32 @@ py-modules = [
     "structured_proposal",
     "verify_loop",
     "vision_indexer",
+    # Console modules and scripts that were imported or run but never packaged before 4.3.1
+    "algorithmic_dd_generator",
+    "bench_trial",
+    "capabilities",
+    "dd_sim",
+    "discover",
+    "dna_lang",
+    "evolve",
+    "nclm_aer_evaluator",
+    "osiris_bench",
+    "osiris_local_qvm",
+    "paste_digest",
+    "pretrain_nclm",
+    "prompt_strategies",
+    "protege",
+    "trials",
+    "verify_ledger",
 ]
 
 [tool.setuptools.packages.find]
-include = ["osiris*", "osiris_cli*", "nclm*", "qbyte_system*", "quantum_discovery*", "scimitar_sse*"]
+include = ["osiris*", "osiris_cli*", "nclm*", "qbyte_system*", "quantum_discovery*", "scimitar_sse*", "bench_tasks", "rqc*"]
+namespaces = true   # bench_tasks has no __init__.py: a .py there would change osiris_bench.suite_sha256
+
+[tool.setuptools.package-data]
+# the benchmark task definitions are data the console and osiris_bench read from <site-packages>/bench_tasks
+bench_tasks = ["*/*", "*/*/*"]
 
 [tool.ruff]
 target-version = "py39"
