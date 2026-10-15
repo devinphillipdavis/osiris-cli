@@ -486,6 +486,33 @@ def main(argv=None) -> int:
                   f"    Refusing to execute to prevent evidence ledger contamination.\n"
                   f"    Start ollama or use --backend gemini.", file=sys.stderr)
             return 1
+    elif args.backend == "gemini":
+        osiris = _load_osiris()
+        if not (hasattr(osiris, "gemini_bridge") and osiris.gemini_bridge.is_configured()):
+            print(f"[!] Backend gemini is not configured.\n"
+                  f"    Refusing to execute to prevent evidence ledger contamination.", file=sys.stderr)
+            return 1
+    elif args.backend == "auto":
+        osiris = _load_osiris()
+        gemini_ok = bool(hasattr(osiris, "gemini_bridge") and osiris.gemini_bridge.is_configured())
+        gemma_ok = False
+        try:
+            from osiris_cli.providers import get_active_provider
+            gemma_ok = bool(get_active_provider().health().available)
+        except Exception:
+            pass
+        ollama_ok = False
+        import urllib.request
+        try:
+            with urllib.request.urlopen("http://localhost:11434/api/tags", timeout=1.5):
+                ollama_ok = True
+        except Exception:
+            pass
+        if not (gemini_ok or gemma_ok or ollama_ok):
+            print(f"[!] No inference backend reachable in auto mode (Gemini unconfigured, Gemma unavailable, Ollama unreachable at http://localhost:11434).\n"
+                  f"    Refusing to execute to prevent evidence ledger contamination.\n"
+                  f"    Start ollama or configure a model provider before benchmarking.", file=sys.stderr)
+            return 1
 
     try:
         log = RunLog(args.out, tasks, args.k, args.backend, model)

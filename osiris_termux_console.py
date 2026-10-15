@@ -5091,6 +5091,7 @@ def query_model(prompt: str, model: str, stream: bool = True, timeout: int = 420
                 body = json.loads(resp.read().decode("utf-8", errors="ignore"))
                 return body.get("response", "")
     except Exception as e:
+        _last_backend["error"] = f"Inference error with {model}: {e}"
         with _stdout_lock:
             installed = _detect_installed_ollama_models(timeout=1.0)
             if installed and model not in installed:

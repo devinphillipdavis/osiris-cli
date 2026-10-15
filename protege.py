@@ -127,8 +127,6 @@ def candidates(entries, suite=None, runner=None, bench_dir=BENCH_DIR):
     def add(entry_hash, header, task, res):
         run_id = header.get("run_id") or header.get("hash")
         is_quarantined = run_id in quarantined_runs or entry_hash in quarantined_runs
-        is_unreachable_duration = (res.get("seconds") is not None and res.get("seconds") <= 0.0)
-
         for row in res.get("attempts", []):
             c = {"entry": entry_hash, "run": run_id,
                  "suite": header.get("suite_sha256"), "task": task,
@@ -139,15 +137,18 @@ def candidates(entries, suite=None, runner=None, bench_dir=BENCH_DIR):
             c["no_output"] = c["module_sha256"] is None
 
             row_reason = str(row.get("hidden_reason") or "").lower()
-            is_unreachable = (
-                is_unreachable_duration or
-                is_quarantined or
+            has_conn_error = (
                 bool(row.get("unreachable")) or
                 bool(res.get("unreachable")) or
                 "unreachable" in row_reason or
                 "connection refused" in row_reason or
-                "connection error" in row_reason
+                "connection error" in row_reason or
+                "errno 111" in row_reason or
+                "urlopen error" in row_reason
             )
+            # Integrity exclusion keys strictly on registered quarantine or verified connection errors.
+            # Raw duration <= 0.0s serves only as corroboration, never as standalone exclusion trigger.
+            is_unreachable = is_quarantined or has_conn_error
             c["integrity"] = is_unreachable or any(c[k] is not None and _artifact(bench_dir, c[k]) is None
                                                   for k in ("prompt_sha256", "module_sha256", "test_sha256"))
             out.append(c)
