@@ -67,10 +67,16 @@ def _load_dotenv():
 _load_dotenv()
 
 OLLAMA_GEN_URL = "http://localhost:11434/api/generate"
-CHAT_MODEL = os.environ.get("OSIRIS_CHAT_MODEL", "llama3.2:1b")
-CODE_MODEL = os.environ.get("OSIRIS_CODE_MODEL", "deepseek-coder")
+CHAT_MODEL = os.environ.get("OSIRIS_CHAT_MODEL", "gemma-3-1b")
+CODE_MODEL = os.environ.get("OSIRIS_CODE_MODEL", "gemma-3-1b")
 
 ARCHITECT_PREFERENCES = (
+    "gemma-3-1b",
+    "gemma-3-4b",
+    "gemma-3-270m",
+    "gemma-2-2b",
+    "gemma3:1b",
+    "gemma:2b",
     "qwen2.5:7b",
     "qwen2.5-coder:7b",
     "qwen2.5:1.5b",
@@ -81,6 +87,10 @@ ARCHITECT_PREFERENCES = (
 )
 
 SYNTHESIZER_PREFERENCES = (
+    "gemma-3-1b",
+    "gemma-3-4b",
+    "gemma-2-2b",
+    "gemma3:1b",
     "qwen2.5-coder:7b",
     "deepseek-coder",
     "qwen2.5:7b",
@@ -1586,7 +1596,7 @@ def _next_best():
                 wont="start any work until you activate the draft")
 
 
-BENCH_LOCAL_MENTORS = ("qwen2.5-coder:7b", "deepseek-coder", "llama3.2:1b")
+BENCH_LOCAL_MENTORS = ("gemma-3-1b", "gemma-3-270m", "gemma-2-2b", "qwen2.5-coder:7b", "deepseek-coder", "llama3.2:1b")
 
 
 def _ollama_models():
@@ -4054,6 +4064,17 @@ def _dd_pretrain(command: str):
 
 
 def _check_ollama_reachable(timeout=OLLAMA_STARTUP_TIMEOUT):
+    # Check if Gemma is explicitly selected or prioritized
+    env_provider = os.environ.get("OSIRIS_MODEL_PROVIDER", "").lower()
+    if env_provider == "gemma":
+        try:
+            from osiris_cli.providers import get_active_provider
+            prov = get_active_provider()
+            if prov.health().available:
+                return True, f"{getattr(prov, 'name', 'gemma')}://native"
+        except Exception:
+            pass
+
     base = OLLAMA_GEN_URL.rsplit("/api/", 1)[0]
     try:
         with urllib.request.urlopen(urllib.request.Request(f"{base}/api/tags"), timeout=timeout):
@@ -4063,6 +4084,15 @@ def _check_ollama_reachable(timeout=OLLAMA_STARTUP_TIMEOUT):
                 pass
             return True, base
     except Exception:
+        # Fallback to provider-neutral Gemma substrate
+        try:
+            from osiris_cli.providers import get_active_provider
+            prov = get_active_provider()
+            if prov.health().available:
+                prov_name = getattr(prov, "name", "gemma")
+                return True, f"{prov_name}://native"
+        except Exception:
+            pass
         return False, base
 
 CODEBASE_INTENT_RE = re.compile(
@@ -4965,6 +4995,35 @@ def sanitize_input(text: str) -> str:
 
 def query_model(prompt: str, model: str, stream: bool = True, timeout: int = 420,
                 fmt: dict = None) -> str:
+    # First: attempt through OSIRIS BaseModelProvider (Gemma substrate)
+    try:
+        from osiris_cli.providers import ProviderRequest, get_active_provider
+        prov = get_active_provider()
+        ollama_installed = _detect_installed_ollama_models(timeout=0.5)
+        if prov.health().available and (not ollama_installed or getattr(prov, "name", "") == "gemma" or os.environ.get("OSIRIS_MODEL_PROVIDER") == "gemma"):
+            req = ProviderRequest(
+                prompt=prompt,
+                model=model,
+                stream=stream,
+                timeout=timeout,
+                response_schema=fmt,
+            )
+            if stream:
+                with _stdout_lock:
+                    chunks = []
+                    for c in prov.stream(req):
+                        if c.text:
+                            sys.stdout.write(c.text)
+                            sys.stdout.flush()
+                            chunks.append(c.text)
+                    print()
+                    return "".join(chunks)
+            else:
+                resp = prov.generate(req)
+                return resp.content
+    except Exception:
+        pass
+
     payload = {
         "model": model,
         "prompt": prompt,
@@ -4985,12 +5044,6 @@ def query_model(prompt: str, model: str, stream: bool = True, timeout: int = 420
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             if stream:
-                # Held for the whole streamed response, not per-token -- a per-
-                # token acquire/release would still let Engine 3's background
-                # thread slip a print() in between two of our tokens. This is
-                # the other half of the fix paired with _stdout_lock's uses in
-                # _organism_learn(); holding it for the whole block is what
-                # actually prevents interleaving, not just reduces it.
                 with _stdout_lock:
                     for line in resp:
                         if line:
@@ -5012,7 +5065,7 @@ def query_model(prompt: str, model: str, stream: bool = True, timeout: int = 420
                 fallback_model = installed[0]
                 print(f"\n[!] Model '{model}' not found in Ollama (HTTP 404). Switching to installed model '{fallback_model}'...")
                 return query_model(prompt, fallback_model, stream=stream, timeout=timeout, fmt=fmt)
-            print(f"\n[!] Ollama connection error with {model}: {e}")
+            print(f"\n[!] Inference error with {model}: {e}")
             if stream: print()
             
     return "".join(full_text)
@@ -5022,26 +5075,11 @@ _last_backend = {"name": None, "model": None}
 
 def _synthesize(prompt: str, system_prompt: str = "", structured: bool = False,
                 only: str = None, ollama_model: str = None) -> str:
-    """Engine 2 hot-swap chain: Gemini cloud-burst -> local
-    Ollama/deepseek-coder (the AI Gateway tier was removed 2026-09-24). The
-    cloud tier is skipped/falls through on any
-    failure (missing key, network, billing/auth). Only this function's
-    callers (auto-enhance and Stage 2 synthesis) are affected -- Engine 1
-    (intent routing) and Engine 3 (the NCLM organism) never go through here.
-
-    structured=True constrains Gemini and Ollama to the proposal JSON schema
-    (structured_proposal.py). _last_backend records which tier
-    answered, for the benchmark and telemetry.
-
-    only="gemini"|"ollama" uses that tier alone with no fallback ("gateway" answers "" -- removed)
-    (a failure returns "" and is recorded in _last_backend["error"]) -- the
-    benchmark uses this to measure one backend at a time. ollama_model
-    overrides CODE_MODEL for the local tier."""
+    """Engine 2 hot-swap chain: Gemini cloud-burst -> Gemma substrate -> local Ollama."""
     _last_backend.update(name=None, error=None, model=None)
     if only is not None:
         return _synthesize_only(only, prompt, system_prompt, structured, ollama_model)
-    # The AI Gateway tier was removed on the operator's request (2026-09-24):
-    # it answered every call with HTTP 403 and wasted one request per candidate.
+
     if gemini_bridge.is_configured():
         try:
             text = gemini_bridge.query(
@@ -5054,9 +5092,29 @@ def _synthesize(prompt: str, system_prompt: str = "", structured: bool = False,
             )
             return text
         except gemini_bridge.GeminiUnavailable as e:
-            print(f"[Engine 2: Gemini unavailable ({e}), falling back to local deepseek-coder]")
-    else:
-        print("[Engine 2: local deepseek-coder]")
+            print(f"[Engine 2: Gemini unavailable ({e}), falling back to local substrate]")
+
+    # Primary: Provider-neutral Gemma substrate
+    try:
+        from osiris_cli.providers import ProviderRequest, get_active_provider
+        prov = get_active_provider()
+        target_model = ollama_model or CODE_MODEL
+        if prov.health().available and getattr(prov, "name", "") == "gemma":
+            print(f"[Engine 2: Gemma substrate ({target_model})]")
+            full = f"{system_prompt}\n\n{prompt}" if system_prompt else prompt
+            req = ProviderRequest(
+                prompt=full,
+                model=target_model,
+                max_tokens=1536,
+                response_schema=structured_proposal.PROPOSAL_SCHEMA if structured else None,
+            )
+            resp = prov.generate(req)
+            _last_backend.update(name="gemma", model=target_model)
+            return resp.content
+    except Exception as e_gemma:
+        print(f"[Engine 2: Gemma error ({e_gemma}), attempting Ollama fallback]")
+
+    print(f"[Engine 2: local {ollama_model or CODE_MODEL}]")
     _last_backend.update(name="ollama", model=ollama_model or CODE_MODEL)
     return query_model(prompt, ollama_model or CODE_MODEL, stream=False,
                        fmt=structured_proposal.PROPOSAL_SCHEMA if structured else None)
@@ -5365,16 +5423,26 @@ SPECIFICATION:
         print(f"[!] Compilation / File Error: {e}\n")
         _spawn_organism_learn(raw_text + "\n" + enhanced_spec)
 
-def _council_engines(ollama_ok: bool):
+def _council_engines(substrate_ok: bool):
     """The startup council card's rows, each state read from a real check."""
-    local = ("verified", "ollama reachable") if ollama_ok else ("review", "ollama UNREACHABLE")
+    try:
+        from osiris_cli.providers import get_active_provider
+        prov = get_active_provider()
+        prov_name = getattr(prov, "name", "gemma")
+        prov_available = prov.health().available or substrate_ok
+        state_tag = f"{prov_name} active" if prov_available else f"{prov_name} UNREACHABLE"
+    except Exception:
+        prov_available = substrate_ok
+        state_tag = "ollama reachable" if substrate_ok else "ollama UNREACHABLE"
+
+    local = ("verified", state_tag) if prov_available else ("review", state_tag)
     clouds = ["gemini"] if gemini_bridge.is_configured() else []
     try:
         with open(os.path.join(ORGANISM_HOME, "organism.json"), encoding="utf-8") as f:
             nclm = ("memory", f"checkpoint at step {json.load(f)['step']}")
     except (OSError, ValueError, KeyError):
         nclm = ("idle", "no checkpoint yet")
-    synth = ("verified" if clouds or ollama_ok else "review",
+    synth = ("verified" if clouds or prov_available else "review",
              " · ".join(clouds + [local[1]]) if clouds else local[1])
     return [(local[0], "Architect", f"{CHAT_MODEL} · intent → spec", local[1]),
             (synth[0], "Synthesizer", f"{_synth_chain()} · spec → code", synth[1]),
@@ -5397,8 +5465,10 @@ def main():
         print(f"[!] Session digest unavailable: {type(e).__name__}: {e}")
     print(" Talk to OSIRIS in plain words, or use a menu key. Enter sends; a paste is sent whole.\n")
     if not ok:
-        print(f"[!] Ollama not reachable at {base} -- start it with 'ollama serve' before using "
-              f"osiris. Continuing anyway; commands will fail until it's up.\n")
+        print(f"[!] Neither Ollama nor Gemma inference substrate is reachable at {base}. "
+              f"Continuing anyway; model commands may fail.\n")
+    else:
+        print(f"[*] Inference Substrate: {base} active.\n")
     try:
         _home()
     except Exception as e:
