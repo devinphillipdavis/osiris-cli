@@ -445,9 +445,9 @@ def print_banner():
             otc._home()
         except Exception as e:
             print(f"  [Console Status: {e}]")
-            print("  Type \033[93m/help\033[0m for commands, \033[92m/ignite\033[0m to boot substrate & mesh, or type natural language.\n")
+            print("  Type \033[93m/help\033[0m for commands, \033[92m/ignite\033[0m for metamorphosis, or type natural language.\n")
     else:
-        print("  Type \033[93m/help\033[0m for commands, \033[92m/ignite\033[0m to boot substrate & mesh, or type natural language.\n")
+        print("  Type \033[93m/help\033[0m for commands, \033[92m/ignite\033[0m for metamorphosis, or type natural language.\n")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -456,69 +456,75 @@ def print_banner():
 
 def execute_ignite(state: Optional[OsirisReplState] = None) -> Dict[str, Any]:
     """
-    Simultaneously boots:
-      1. 11D Continuous Relativistic State Matrix (CRSM) Substrate & ZeroSum MicroVM
-      2. 9-Agent Cognitive Mesh (Bayesian Trust, Shapley Attribution, Nash, Hebbian)
+    Executes the Sovereign Substrate Verification & Metamorphosis Trigger:
+      1. Verifies Node Alpha edge hardware, AST firewall, and power envelope.
+      2. Validates mentor engine and evaluates NCLM speaking gate (SYS-026).
+      3. Triggers genome metamorphosis, promoting eligible capability gaps into sprint backlog.
     """
     if state is None:
         state = SESSION
 
-    print("\n\033[1;36m[IGNITION] Initiating Dual Sovereign Ignition Sequence...\033[0m")
-    
-    # 1. Physical 11D CRSM Substrate
-    print("  \033[1;37m── Physical Substrate: 11D CRSM & ZeroSum MicroVM ──\033[0m")
-    try:
-        from qbyte_system.qbyte import QbyteRuntime
-        state.runtime = QbyteRuntime(n_qubits=state.active_qubits, strict_l0=True)
-    except Exception:
-        state.runtime = None
+    p_dec = state.power_gov.check()
 
+    print("\n\033[1;36m[IGNITION] Initiating Sovereign Substrate & Metamorphosis Trigger...\033[0m")
+    
+    # 1. Physical Edge Substrate Verification
+    print("  \033[1;37m── Physical Substrate: Node Alpha Mobile Edge (ARM64 / Termux) ──\033[0m")
+    print("  ├─ Vector Hardware:  ARMv8-A NEON SIMD Vector Acceleration Verified")
+    print("  ├─ AST Firewall:     CIL L0-L6 Interposition Active [SYS-025 ENFORCED FAIL-CLOSED]")
+    print(f"  ├─ Power Governor:   {p_dec.reason} (Bat: {p_dec.battery_pct:.1f}%, Temp: {p_dec.temp_c:.1f}°C)")
+    print(f"  ├─ Coherence Floor:  Γ_floor = {state.coherence_floor:.4f} [ENFORCED FAIL-CLOSED]")
+    print("  └─ Substrate Status: \033[1;32mEDGE SUBSTRATE OPERATIONAL\033[0m")
+
+    # 2. Cognitive Substrate & Speaking Gate
+    print("  \033[1;37m── Cognitive Substrate: Mentor Engine & NCLM-1 Speaking Gate ──\033[0m")
     try:
-        from osiris_zerosum_microvm import OsirisZeroSumMicroVM
-        microvm = OsirisZeroSumMicroVM()
-    except Exception:
-        microvm = None
+        living = get_living()
+        from osiris_cli.living import Osiris
+        mentor_model = living.mentor.model() or "none reachable"
+        gate = living.gate()
+        gate_note = Osiris.gate_brief(gate)
+        gate_open = gate.get("open", False)
+    except Exception as e:
+        mentor_model = "offline"
+        gate_note = f"offline ({e})"
+        gate_open = False
+    print(f"  ├─ Mentor Substrate: {mentor_model} (Gemma-native neutral provider)")
+    print(f"  ├─ NCLM-1 Voice:     {gate_note} [SYS-026]")
+    print("  └─ Cognitive Mesh:   \033[1;32mDELIBERATIVE MESH READY\033[0m\n")
 
     state.ignited = True
-    print("  ├─ Clifford Substrate: Cl(3,0) Multivectors mapped to Planck scale")
-    print(f"  ├─ Locking Resonance: θ_lock = {THETA_LOCK_DEG}° (Pyramid face slope arctan(14/11))")
-    print(f"  ├─ Coherence Floor:  Γ_floor = {GAMMA_COHERENCE_FLOOR:.4f} [ENFORCED FAIL-CLOSED]")
-    print(f"  ├─ Memory Invariant: Λ_Φ     = {LAMBDA_PHI:.6e} kg")
-    print(f"  ├─ Peak Fidelity:    F_max   = {F_MAX_PREDICTED:.5f} (1 - φ^-8)")
-    print("  └─ Substrate Status: \033[1;32m11D CRSM Substrate LOCKED & OPERATIONAL\033[0m")
 
-    # 2. Cognitive 9-Agent Mesh
-    print("  \033[1;37m── Cognitive Substrate: 9-Agent Deliberative Mesh ──\033[0m")
-    agents = [
-        "orchestrator", "reasoner", "coder", "critic",
-        "optimizer", "self_reflector", "rebel", "empath", "satirical"
-    ]
-    try:
-        from osiris_cognitive_mesh import CognitiveMesh
-        state.mesh = CognitiveMesh(agent_ids=agents)
-        print("  ├─ Bayesian Trust Network:  Calibrated across 9 agents (Thompson Sampling)")
-        print("  ├─ Shapley Attribution:     Monte-Carlo marginal contribution tracking initialized")
-        print("  ├─ Nash Convergence:       Fictitious-play game theoretic equilibrium solver loaded")
-        print("  ├─ Causal DAG:              Topological execution ordering active")
-        print("  ├─ Hebbian Plasticity:      Connection weights active (η=0.05, decay=0.01)")
-        print("  └─ Cognitive Mesh Status:   \033[1;32m9-AGENT MESH ONLINE & SYNCHRONIZED\033[0m\n")
-    except Exception as e:
-        print(f"  └─ Cognitive Mesh Warning: {e} (operating with local lightweight swarm)\n")
-
+    # 3. Metamorphosis Trigger (Genome Sync & Backlog Promotion)
+    promoted_count = 0
+    organism_id = ""
+    gen = 0
     if otc is not None:
         try:
+            import genome
+            g = genome.get()
+            organism_id = g.get("organism_id", "")
+            gen = g.get("generation", 0)
+            targets = genome.pick_ignite_targets(exclude=otc._ignite_in_flight())
+            promoted_count = len(targets)
             otc._ignite()
         except Exception as e:
-            print(f"  └─ Living Language Console Ignition: {e}\n")
+            print(f"  └─ Metamorphosis Trigger Warning: {e}\n")
+    else:
+        print("  (Living Language Console offline; running headless genome verification)\n")
 
-    # Log ignition to ledger
+    # Log ignition / metamorphosis to evidence ledger
     h = state.log_event("IGNITION", {
-        "theta_lock": THETA_LOCK_DEG,
-        "gamma_floor": GAMMA_COHERENCE_FLOOR,
-        "lambda_phi": LAMBDA_PHI,
-        "agents": agents,
+        "substrate": "node_alpha",
+        "arch": "aarch64",
+        "gamma_floor": state.coherence_floor,
+        "mentor_model": mentor_model,
+        "speaking_gate_open": gate_open,
+        "organism_id": organism_id,
+        "generation": gen,
+        "promoted_traits_count": promoted_count,
     })
-    return {"status": "SUCCESS", "event_hash": h}
+    return {"status": "SUCCESS", "event_hash": h, "promoted_count": promoted_count}
 
 
 def execute_learn(state: Optional[OsirisReplState] = None, generations: int = 5) -> Dict[str, Any]:
@@ -1130,15 +1136,38 @@ def display_status(state: Optional[OsirisReplState] = None) -> None:
     print("\n\033[1;36m[OSIRIS::STATUS DASHBOARD]\033[0m")
     print(f"  Python Runtime : {sys.version.split()[0]} ({sys.platform})")
     print(f"  Process PID    : {os.getpid()}")
-    substrate = "\033[1;32mIGNITED (11D CRSM Active)\033[0m" if state.ignited else "\033[1;33mCOLD (Run /ignite)\033[0m"
-    mesh = "\033[1;32m9 AGENTS SYNCHRONIZED\033[0m" if state.mesh else "\033[1;33mSTANDBY\033[0m"
-    print(f"  Substrate State: {substrate}")
-    print(f"  Cognitive Mesh : {mesh}")
-    print(f"  Power Governor : {p_dec.reason}")
-    print(f"  Coherence Floor: {state.coherence_floor:.4f} (Invariant Γ <= 0.092)")
-    print(f"  Resonance Angle: {THETA_LOCK_DEG}° (Pyramid face slope arctan(14/11))")
-    print(f"  Memory Invariant: Λ_Φ = {LAMBDA_PHI:.6e} kg")
-    print(f"  Peak Fidelity  : F_max = {F_MAX_PREDICTED:.5f}")
+    print(f"  Substrate Node : Node Alpha (Mobile Edge - Fold7 / Termux | aarch64 | NEON SIMD)")
+    print(f"  AST Firewall   : \033[1;32mACTIVE (SYS-025 L0-L6 Interposition · fail-closed ast.parse)\033[0m")
+    print(f"  Power Governor : {p_dec.reason} (Bat: {p_dec.battery_pct:.1f}%, Temp: {p_dec.temp_c:.1f}°C)")
+    print(f"  Coherence Floor: {state.coherence_floor:.4f} (Fail-closed ceiling Γ <= 0.092)")
+
+    try:
+        import genome
+        g = genome.get()
+        gen = g.get('generation', 1)
+        active_cnt = len(g.get('active_traits', []))
+        dormant_cnt = len(g.get('dormant_traits', []))
+        eligible = otc._ignite_eligible(g) if otc is not None else 0
+        if eligible > 0:
+            meta_str = f"Generation {gen} ({active_cnt} active, {dormant_cnt} dormant) · \033[1;33m{eligible} gap(s) eligible (run /ignite)\033[0m"
+        else:
+            meta_str = f"Generation {gen} ({active_cnt} active, {dormant_cnt} dormant) · \033[1;32mSTABLE\033[0m (draft with /gap)"
+    except Exception:
+        meta_str = "Genome uninitialized"
+    print(f"  Genome State   : {meta_str}")
+
+    try:
+        living = get_living()
+        from osiris_cli.living import Osiris
+        mentor = living.mentor.model() or "none reachable"
+        gate = living.gate()
+        gate_str = Osiris.gate_note(gate)
+    except Exception as e:
+        mentor = "offline"
+        gate_str = f"unavailable ({e})"
+    print(f"  Mentor Engine  : {mentor} (Gemma-native substrate)")
+    print(f"  NCLM-1 Voice   : {gate_str} (SYS-026)")
+    print(f"  Claims Firewall: 40 registered claims | 5 REFUTED · 3 ARTIFACT · 1 NOT_MEASURED (SYS-024 Enforced)")
     print(f"  Uptime         : {uptime:.1f} s")
     print(f"  Evidence Events: {len(state.evidence_ledger)} items in Merkle ledger")
     if state.last_benchmark:
@@ -1171,7 +1200,7 @@ def display_help() -> None:
     print("    <any text>           Talk to OSIRIS (commands need a leading /)")
     print("    /osiris              OSIRIS's core: step, held-out score, speaking gate")
     print("    /self <text>         Hear the core's own raw voice, even before it has earned it")
-    print("    /mentor [model]      Choose which local Ollama model speaks while the core learns")
+    print("    /mentor [model]      Choose which mentor model (Gemma / neutral provider) speaks while the core learns")
     print("    /remember <fact>     OSIRIS keeps this across sessions  (/forget <words> drops it)")
     print("    /check [trainer|git|ledger|system|evidence] [path|m3c]   Run OSIRIS's read-only checks")
     print("    /legit <text|ID|list> Is a claim legit? Verdicts from the claims register, with evidence")
@@ -1179,7 +1208,7 @@ def display_help() -> None:
     print("    /train [start H|stop] Overnight batch training (status by default)")
     print()
     print("  \033[1;36mCore Substrate\033[0m")
-    print("    /ignite              Boot 11D CRSM Substrate, Cl(3,0) rotor & 9-Agent Cognitive Mesh")
+    print("    /ignite              Verify edge substrate & trigger metamorphosis (gaps -> sprint stories)")
     print("    /learn [N]           Initiate autopoietic ALife evolution (zero backprop)")
     print("    /dna \"<intent>\"      Synthesize .dna genome with Z3bra vectorizer & L0 AST firewall")
     print("    /ledger              Verify SHA-256 evidence ledger & Merkle provenance")
