@@ -48,3 +48,7 @@ venv312/
 
 # Local REPL interaction history (private)
 .osiris_history.jsonl
+
+# Untracked sub-clones
+repos/
+
