@@ -39,8 +39,15 @@ import hashlib
 import json
 import math
 import os
+import platform
 import re
-import readline
+try:
+    import readline
+except ImportError:
+    try:
+        import pyreadline3 as readline
+    except ImportError:
+        readline = None
 import shutil
 import subprocess
 import sys
@@ -395,6 +402,29 @@ class OsirisReplState:
         self.telemetry_history: List[Dict[str, Any]] = []
         self.evidence_ledger: List[Dict[str, Any]] = []
 
+        # Dual-Substrate Hardware Mesh auto-detection
+        try:
+            from osiris_hardware_mesh import HardwareMeshDetector
+            self.hardware_profile = HardwareMeshDetector.detect()
+        except Exception:
+            self.hardware_profile = None
+
+        if self.hardware_profile:
+            self.log_event("HARDWARE_SUBSTRATE_DETECTED", {
+                "node_type": self.hardware_profile.node_type.value,
+                "machine_arch": self.hardware_profile.machine_arch,
+                "cpu_model": self.hardware_profile.cpu_model,
+                "cpu_cores": self.hardware_profile.cpu_cores,
+                "is_termux": self.hardware_profile.is_termux,
+                "is_android": self.hardware_profile.is_android,
+                "has_neon": self.hardware_profile.has_neon,
+                "has_avx2": self.hardware_profile.has_avx2,
+                "has_avx_vnni": self.hardware_profile.has_avx_vnni,
+                "has_intel_arc": self.hardware_profile.has_intel_arc,
+                "execution_timeout_s": self.hardware_profile.execution_timeout_s,
+                "allow_extended_horizons": self.hardware_profile.allow_extended_horizons,
+            })
+
     def log_event(self, event_type: str, details: Dict[str, Any]) -> str:
         """Appends an event to the local cryptographic evidence ledger."""
         prev_hash = self.evidence_ledger[-1]["hash"] if self.evidence_ledger else "0" * 64
@@ -433,6 +463,15 @@ def print_banner():
         print("\033[90m  Mode: desktop wide (≥100 cols)\033[0m")
     else:
         print("\033[90m  Mode: MOBILE COMPACT / TERMUX (<100 cols) | Adaptive View Enabled\033[0m")
+    
+    # Dynamic Hardware Mesh Substrate Evaluation
+    hp = getattr(SESSION, "hardware_profile", None)
+    if hp:
+        is_alpha = hp.is_termux or hp.machine_arch in ("aarch64", "arm64")
+        node_name = "Node Alpha: Mobile Edge (Fold7 / Termux)" if is_alpha else "Node Beta: Compute Workstation (PC / Intel Core Ultra / WSL)"
+        simd_feat = "NEON SIMD Vector" if hp.has_neon else ("AVX2 / AVX-VNNI" if (hp.has_avx2 or hp.has_avx_vnni) else "Standard Vector")
+        print(f"\033[92m  [SUBSTRATE MESH] {node_name} | Arch: {hp.machine_arch} | SIMD: {simd_feat}\033[0m")
+        print(f"\033[90m  [RESOURCE LIMITS] Horizon: {hp.execution_timeout_s:.0f}s (Extended={hp.allow_extended_horizons}) | Coherence Floor: {hp.coherence_floor}\033[0m\n")
     
     if otc is not None and osiris_ui is not None:
         try:
@@ -508,12 +547,18 @@ def execute_ignite(state: Optional[OsirisReplState] = None) -> Dict[str, Any]:
         except Exception as e:
             print(f"  └─ Living Language Console Ignition: {e}\n")
 
-    # Log ignition to ledger
+    # Log ignition to ledger with hardware substrate context
+    hp = getattr(state, "hardware_profile", None)
+    node_val = hp.node_type.value if hp else "UNKNOWN"
+    arch_val = hp.machine_arch if hp else platform.machine()
     h = state.log_event("IGNITION", {
         "theta_lock": THETA_LOCK_DEG,
         "gamma_floor": GAMMA_COHERENCE_FLOOR,
         "lambda_phi": LAMBDA_PHI,
         "agents": agents,
+        "substrate_node": node_val,
+        "machine_arch": arch_val,
+        "execution_timeout_s": hp.execution_timeout_s if hp else 300.0,
     })
     return {"status": "SUCCESS", "event_hash": h}
 
@@ -1164,6 +1209,15 @@ def display_status(state: Optional[OsirisReplState] = None) -> None:
     mesh = "\033[1;32m9 AGENTS SYNCHRONIZED\033[0m" if state.mesh else "\033[1;33mSTANDBY\033[0m"
     print(f"  Substrate State: {substrate}")
     print(f"  Cognitive Mesh : {mesh}")
+    
+    hp = getattr(state, "hardware_profile", None)
+    if hp:
+        is_alpha = hp.is_termux or hp.machine_arch in ("aarch64", "arm64")
+        node_lbl = "Node Alpha: Mobile Edge (Fold7 / Termux)" if is_alpha else "Node Beta: Compute Workstation (PC / Intel Core Ultra / WSL)"
+        print(f"  Substrate Mesh : \033[1;32m{node_lbl}\033[0m")
+        print(f"  Architecture   : {hp.machine_arch} ({hp.cpu_model}) | Cores: {hp.cpu_cores}")
+        print(f"  Acceleration   : NEON={hp.has_neon}, AVX2={hp.has_avx2}, AVX-VNNI={hp.has_avx_vnni}, Intel Arc={hp.has_intel_arc}")
+        print(f"  Exec Horizon   : {hp.execution_timeout_s:.0f}s (Extended Horizons: {hp.allow_extended_horizons})")
     print(f"  Power Governor : {p_dec.reason}")
     print(f"  Coherence Floor: {state.coherence_floor:.4f} (configured threshold, not a measured invariant)")
     try:
@@ -1219,6 +1273,8 @@ def display_help() -> None:
     print("    /legit <text|ID|list> Is a claim legit? Verdicts from the claims register, with evidence")
     print("    /gemini [--dry] <q>  Ask Gemini directly (advisory; redacted, budgeted, ledgered)")
     print("    /physics <check> k=v  Physics bounds: thrust, rim, metric, chsh, efficiency, entropy, dd")
+    print("    /retrieval [status|load-scifact|build-index|run|evaluate|capsule|verify|query|unload]")
+    print("                         olmo3-embed-7b evidence retrieval over SciFact (ranks evidence; no verdicts)")
     print("    /train [start H|stop|rescore] Overnight batch training (status by default)")
     print()
     print("  \033[1;36mCore Substrate\033[0m")
@@ -1516,6 +1572,9 @@ def dispatch_command(state: OsirisReplState, line: str) -> None:
     elif cmd == "/physics":
         from osiris_cli import physics_checks
         print("\n" + physics_checks.run_command(line_clean[len(parts[0]):].strip()) + "\n")
+    elif cmd == "/retrieval":
+        from osiris_cli import retrieval
+        print("\n" + retrieval.run_command(line_clean[len(parts[0]):].strip()) + "\n")
     elif cmd == "/check":
         living = get_living()
         names = [p for p in parts[1:] if p in ("trainer", "git", "ledger", "system", "evidence")] or \
@@ -1627,6 +1686,9 @@ def main(argv: Optional[List[str]] = None) -> None:
         from osiris_cli import train as osiris_train
         osiris_train.main(argv[1:])
         return
+    if argv and argv[0] in ("retrieval", "/retrieval"):
+        from osiris_cli import retrieval
+        sys.exit(retrieval.main(argv[1:]))
 
     parser = argparse.ArgumentParser(
         prog="osiris",
