@@ -1616,9 +1616,12 @@ def _next_mentor_round(protege):
     entries, problem = protege.load_ledger()
     if problem:
         return None
-    card = protege.scorecard(protege.candidates(entries, protege.current_suite(), protege.current_runner())[0])
     installed = _ollama_models()
-    have = lambda m: installed is None or m in installed or f"{m}:latest" in installed
+    if installed is None:
+        # Ollama daemon is offline: cannot benchmark local Ollama mentors
+        return None
+    card = protege.scorecard(protege.candidates(entries, protege.current_suite(), protege.current_runner())[0])
+    have = lambda m: m in installed or f"{m}:latest" in installed
     n = lambda m: card.get(f"ollama/{m}", {}).get("candidates", 0)
     measured = [f"{m} {card[f'ollama/{m}']['verified']}/{n(m)}" for m in BENCH_LOCAL_MENTORS if n(m)]
     done = ("measured so far: " + ", ".join(measured) + " hidden-test passes") if measured else "nothing measured"
@@ -3074,6 +3077,16 @@ def _bench_preflight(command, argv, label, ui):
     tasks = argv[argv.index("--tasks") + 1].split(",") if "--tasks" in argv else ["all 9 tasks"]
     k = int(argv[argv.index("--k") + 1])
     mentor = f"{argv[3]}/{argv[argv.index('--model') + 1]}" if "--model" in argv else argv[3]
+
+    if argv[3] == "ollama":
+        installed = _ollama_models()
+        if installed is None:
+            print("\n" + osiris_ui.notice(ui, "blocked", "BACKEND UNREACHABLE",
+                                         f"Cannot start benchmark: Ollama daemon is offline (http://localhost:11434 unreachable).\n"
+                                         "Start Ollama before benchmarking, or benchmark gemini with: /bench gemini\n"
+                                         "Refusing to execute to prevent evidence ledger contamination."))
+            return
+
     est, base = "a few minutes per task on a phone", "no earlier round to compare with"
     entries, problem = protege.load_ledger()
     if not problem:
@@ -3310,6 +3323,14 @@ def _bench(command: str = "/bench"):
     if argv is None:
         print("\n" + osiris_ui.notice(ui, "review", "BENCH", label) + "\n")
         return
+    if argv[3] == "ollama":
+        installed = _ollama_models()
+        if installed is None:
+            print("\n" + osiris_ui.notice(ui, "blocked", "BACKEND UNREACHABLE",
+                                         f"Cannot start benchmark: Ollama daemon is offline (http://localhost:11434 unreachable).\n"
+                                         "Start Ollama before benchmarking, or benchmark gemini with: /bench gemini\n"
+                                         "Refusing to execute to prevent evidence ledger contamination."))
+            return
     if "now" not in command.lower().split()[1:]:
         _bench_preflight(command, argv, label, ui)
         return
@@ -3776,7 +3797,18 @@ def _organism_status():
     print(f"  step:           {step}")
     print(f"  recent losses:  {', '.join(f'{v:.3f}' for v in recent) if recent else '(none yet)'}")
     if recent:
-        print(f"  mean(last {len(recent)}):  {sum(recent) / len(recent):.4f}")
+        import math
+        mean_nats = sum(recent) / len(recent)
+        mean_bpb = mean_nats / math.log(2)
+        uni_bpb = 5.08
+        baseline_file = "/root/unigram_baseline.json"
+        if os.path.exists(baseline_file):
+            try:
+                with open(baseline_file, encoding="utf-8") as bf:
+                    uni_bpb = float(json.load(bf).get("bits_per_byte", 5.08))
+            except Exception:
+                pass
+        print(f"  mean(last {len(recent)}):  {mean_nats:.4f} nats ({mean_bpb:.2f} vs {uni_bpb:.2f} unigram baseline)")
     print(f"  checkpoint:     {_format_age(mtime)}")
     print()
 

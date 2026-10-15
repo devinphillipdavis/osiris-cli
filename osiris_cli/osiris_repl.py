@@ -134,6 +134,7 @@ class PowerGovernor:
         self.throttle_temp = throttle_temp
         self.abort_temp = abort_temp
         self._is_termux = "TERMUX_VERSION" in os.environ or os.path.exists("/data/data/com.termux")
+        self._outage_logged = False
 
     def check(self) -> PowerDecision:
         if not self._is_termux:
@@ -163,8 +164,14 @@ class PowerGovernor:
         except Exception:
             pass
 
-        # Fallback safe allow
-        return PowerDecision(True, "Termux sensor offline, operating in fail-safe allow mode", 85.0, 35.0)
+        # Fallback fail-open mode (sensor offline)
+        if not getattr(self, "_outage_logged", False):
+            try:
+                SESSION.log_event("POWER_SENSOR_OUTAGE", {"reason": "termux-battery-status offline", "mode": "FAIL_OPEN"})
+            except Exception:
+                pass
+            self._outage_logged = True
+        return PowerDecision(True, "Termux sensor offline, operating in fail-open mode", 85.0, 35.0)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -728,6 +735,8 @@ def execute_mesh(state: Optional[OsirisReplState] = None) -> None:
 
     print("\n\033[1;36m══════════════════════════════════════════════════════════════════════\033[0m")
     print("\033[1;36m  OSIRIS 9-AGENT COGNITIVE MESH TELEMETRY & ATTRIBUTION DASHBOARD    \033[0m")
+    print("\033[1;33m  [CLAIMS FIREWALL · SYS-024] Architecture: MODEL_PROPOSED / DELIBERATION ROLES\033[0m")
+    print("\033[1;33m  Status: Simulation Persona Scaffold (Dynamic weights advisory, not certified)\033[0m")
     print("\033[1;36m══════════════════════════════════════════════════════════════════════\033[0m")
     
     agents = state.mesh.agent_ids
@@ -755,10 +764,11 @@ def execute_mesh(state: Optional[OsirisReplState] = None) -> None:
 
     print("  " + "-" * 70)
     top_conns = state.mesh.hebbian.top_connections(3)
-    print("  Top Hebbian Coalitions:")
+    print("  Top Hebbian Coalitions (Deliberation Graph):")
     for a1, a2, w in top_conns:
         print(f"    • {a1} ↔ {a2}: connection strength = {w:+.4f}")
-    print()
+    print("\n  \033[2m[PROVENANCE] 9-agent weights reflect local heuristic simulation scaffold.")
+    print("  Empirical verification required before promotion to autonomous consensus authority.\033[0m\n")
 
 
 def execute_introspect(state: Optional[OsirisReplState] = None) -> None:
