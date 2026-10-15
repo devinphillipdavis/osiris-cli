@@ -138,6 +138,14 @@ class TestSwarmMasterPromptIntegration(unittest.TestCase):
 class TestSwarmDeliberation(unittest.TestCase):
     """Test swarm produces structured output with consensus voting."""
 
+    def setUp(self):
+        from unittest.mock import patch
+        self._patcher = patch("osiris_ncllm_swarm._OLLAMA_AVAILABLE", False)
+        self._patcher.start()
+
+    def tearDown(self):
+        self._patcher.stop()
+
     def test_single_round_deliberation(self):
         from osiris_ncllm_swarm import NCLLMSwarm
         swarm = NCLLMSwarm(user_id="test_integration")

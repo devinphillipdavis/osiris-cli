@@ -62,6 +62,9 @@ GENESIS = "0" * 64
 MIN_TASK_CANDIDATES = 3    # below this, a mentor has no standing on a task
 MIN_MENTOR_CANDIDATES = 9  # ... or overall
 Z95 = 1.959964
+COMPATIBLE_RUNNERS = {
+    "d18f87f49f03cb0911164e178cc79ac42c74267b8429aa64c1b68d5e39469b26",  # v4.3.0 baseline runner
+}
 
 
 # ------------------------------------------------------------------ evidence
@@ -106,28 +109,58 @@ def candidates(entries, suite=None, runner=None, bench_dir=BENCH_DIR):
 
     Each record is classified: no_output (the mentor produced no usable
     candidate -- a verified failure) or integrity (a hash the ledger names
-    has no matching artifact -- an evidence defect, not a model failure)."""
+    has no matching artifact, or an unreachable backend/infrastructure drop --
+    an evidence defect, not a model failure)."""
     out, skipped = [], 0
     headers, seen = {}, set()
 
+    quarantined_runs = set()
+    quarantine_file = os.path.join(bench_dir, "quarantine.json")
+    if os.path.exists(quarantine_file):
+        try:
+            with open(quarantine_file, encoding="utf-8") as qf:
+                qdata = json.load(qf)
+                quarantined_runs.update(qdata.get("quarantined_runs", {}).keys())
+        except Exception:
+            pass
+
     def add(entry_hash, header, task, res):
+        run_id = header.get("run_id") or header.get("hash")
+        is_quarantined = run_id in quarantined_runs or entry_hash in quarantined_runs
         for row in res.get("attempts", []):
-            c = {"entry": entry_hash, "run": header.get("run_id") or header.get("hash"),
+            c = {"entry": entry_hash, "run": run_id,
                  "suite": header.get("suite_sha256"), "task": task,
                  "mentor": mentor_of(header, row), "n": row.get("n"),
                  "own_ok": bool(row.get("own_ok")), "hidden_ok": bool(row.get("hidden_ok")),
                  "prompt_sha256": row.get("prompt_sha256"),
                  "module_sha256": row.get("module_sha256"), "test_sha256": row.get("test_sha256")}
             c["no_output"] = c["module_sha256"] is None
-            c["integrity"] = any(c[k] is not None and _artifact(bench_dir, c[k]) is None
-                                 for k in ("prompt_sha256", "module_sha256", "test_sha256"))
+
+            row_reason = str(row.get("hidden_reason") or "").lower()
+            has_conn_error = (
+                bool(row.get("unreachable")) or
+                bool(res.get("unreachable")) or
+                "unreachable" in row_reason or
+                "connection refused" in row_reason or
+                "connection error" in row_reason or
+                "errno 111" in row_reason or
+                "urlopen error" in row_reason
+            )
+            # Integrity exclusion keys strictly on registered quarantine or verified connection errors.
+            # Raw duration <= 0.0s serves only as corroboration, never as standalone exclusion trigger.
+            is_unreachable = is_quarantined or has_conn_error
+            c["integrity"] = is_unreachable or any(c[k] is not None and _artifact(bench_dir, c[k]) is None
+                                                  for k in ("prompt_sha256", "module_sha256", "test_sha256"))
             out.append(c)
 
     def comparable(header):
         # A prompt-strategy trial (bench_trial.py) poses tasks differently on purpose:
         # it is judged against its control by trials.py, never pooled into a mentor's score.
-        return not ((suite and header.get("suite_sha256") != suite) or
-                    (runner and header.get("runner_sha256") != runner) or header.get("strategy"))
+        runner_ok = (runner is None or 
+                     header.get("runner_sha256") == runner or 
+                     header.get("runner_sha256") in COMPATIBLE_RUNNERS)
+        suite_ok = (suite is None or header.get("suite_sha256") == suite)
+        return suite_ok and runner_ok and not header.get("strategy")
 
     for e in entries:
         kind = e.get("kind")
@@ -262,7 +295,7 @@ def format_scorecard(card, skipped=0, suite=None):
                   f"  hidden-test pass       {m['verified']}/{m['candidates']}   Wilson 95% {lo:.2f}-{hi:.2f}",
                   f"  own pass, hidden fail  {m['false_confidence']}",
                   f"  no output              {m['no_output']}   (counted as fails)",
-                  f"  integrity exclusions   {m['integrity_excluded']}   (missing/altered evidence; not scored)",
+                  f"  integrity exclusions   {m['integrity_excluded']}   (missing/unreachable evidence; not scored)",
                   f"  runs                   {len(m['runs'])}"]
     lines.append("Only runs on the current task suite AND benchmark runner are counted.")
     if skipped:

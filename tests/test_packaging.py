@@ -82,6 +82,7 @@ def test_scripts_the_console_runs_by_path_are_packaged():
 
 
 def test_bench_results_land_where_the_console_reads():
+    assert not os.path.exists(os.path.join(ROOT, "bench_tasks", "__init__.py")), "would change suite_sha256"
     import osiris_bench
     import protege
     assert osiris_bench.DEFAULT_OUT == protege.BENCH_DIR
