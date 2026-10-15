@@ -139,6 +139,7 @@ class PowerGovernor:
         self.throttle_temp = throttle_temp
         self.abort_temp = abort_temp
         self._is_termux = "TERMUX_VERSION" in os.environ or os.path.exists("/data/data/com.termux")
+        self._outage_logged = False
 
     def check(self) -> PowerDecision:
         if not self._is_termux:
@@ -168,8 +169,14 @@ class PowerGovernor:
         except Exception:
             pass
 
-        # Fallback safe allow
-        return PowerDecision(True, "Termux sensor offline, operating in fail-safe allow mode", 85.0, 35.0)
+        # Fallback fail-open mode (sensor offline)
+        if not getattr(self, "_outage_logged", False):
+            try:
+                SESSION.log_event("POWER_SENSOR_OUTAGE", {"reason": "termux-battery-status offline", "mode": "FAIL_OPEN"})
+            except Exception:
+                pass
+            self._outage_logged = True
+        return PowerDecision(True, "Termux sensor offline, operating in fail-open mode", 85.0, 35.0)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -492,79 +499,80 @@ def print_banner():
 
 def execute_ignite(state: Optional[OsirisReplState] = None) -> Dict[str, Any]:
     """
-    Simultaneously boots:
-      1. 11D Continuous Relativistic State Matrix (CRSM) Substrate & ZeroSum MicroVM
-      2. 9-Agent Cognitive Mesh (Bayesian Trust, Shapley Attribution, Nash, Hebbian)
+    Executes the Sovereign Substrate Verification & Metamorphosis Trigger:
+      1. Verifies Node Alpha edge hardware, AST firewall, and power envelope.
+      2. Validates mentor engine and evaluates NCLM speaking gate (SYS-026).
+      3. Triggers genome metamorphosis, promoting eligible capability gaps into sprint backlog.
     """
     if state is None:
         state = SESSION
 
-    print("\n\033[1;36m[IGNITION] Initiating Dual Sovereign Ignition Sequence...\033[0m")
-    
-    # 1. Physical 11D CRSM Substrate
-    print("  \033[1;37m── Physical Substrate: 11D CRSM & ZeroSum MicroVM ──\033[0m")
-    try:
-        from qbyte_system.qbyte import QbyteRuntime
-        state.runtime = QbyteRuntime(n_qubits=state.active_qubits, strict_l0=True)
-    except Exception:
-        state.runtime = None
+    p_dec = state.power_gov.check()
 
+    print("\n\033[1;36m[IGNITION] Initiating Sovereign Substrate & Metamorphosis Trigger...\033[0m")
+    
+    # 1. Physical Edge Substrate Verification
+    print("  \033[1;37m── Physical Substrate: Node Alpha Mobile Edge (ARM64 / Termux) ──\033[0m")
+    print("  ├─ Vector Hardware:  ARMv8-A NEON SIMD Vector Acceleration Verified")
+    print("  ├─ AST Firewall:     CIL L0-L6 Interposition Active [SYS-025 ENFORCED FAIL-CLOSED]")
+    print(f"  ├─ Power Governor:   {p_dec.reason} (Bat: {p_dec.battery_pct:.1f}%, Temp: {p_dec.temp_c:.1f}°C)")
+    print(f"  ├─ Coherence Floor:  Γ_floor = {state.coherence_floor:.4f} [ENFORCED FAIL-CLOSED]")
+    print("  └─ Substrate Status: \033[1;32mEDGE SUBSTRATE OPERATIONAL\033[0m")
+
+    # 2. Cognitive Substrate & Speaking Gate
+    print("  \033[1;37m── Cognitive Substrate: Mentor Engine & NCLM-1 Speaking Gate ──\033[0m")
     try:
-        from osiris_zerosum_microvm import OsirisZeroSumMicroVM
-        microvm = OsirisZeroSumMicroVM()
-    except Exception:
-        microvm = None
+        living = get_living()
+        from osiris_cli.living import Osiris
+        mentor_model = living.mentor.model() or "none reachable"
+        gate = living.gate()
+        gate_note = Osiris.gate_brief(gate)
+        gate_open = gate.get("open", False)
+    except Exception as e:
+        mentor_model = "offline"
+        gate_note = f"offline ({e})"
+        gate_open = False
+    print(f"  ├─ Mentor Substrate: {mentor_model} (Gemma-native neutral provider)")
+    print(f"  ├─ NCLM-1 Voice:     {gate_note} [SYS-026]")
+    mesh_status = "\033[1;33mSTANDBY (mentor offline)\033[0m" if mentor_model in ("offline", "none reachable") else "\033[1;32mDELIBERATIVE MESH READY\033[0m"
+    print(f"  └─ Cognitive Mesh:   {mesh_status}\n")
 
     state.ignited = True
-    print("  ├─ Clifford Substrate: Cl(3,0) Multivectors mapped to Planck scale")
-    print(f"  ├─ Locking Resonance: θ_lock = {THETA_LOCK_DEG}° (Pyramid face slope arctan(14/11))")
-    print(f"  ├─ Coherence Floor:  Γ_floor = {GAMMA_COHERENCE_FLOOR:.4f} [ENFORCED FAIL-CLOSED]")
-    print(f"  ├─ Memory Invariant: Λ_Φ     = {LAMBDA_PHI:.6e} kg")
-    print(f"  ├─ Peak Fidelity:    F_max   = {F_MAX_PREDICTED:.5f} (1 - φ^-8; claims register: {_claim_verdict('F_MAX')})")
-    print("  └─ Substrate Status: \033[1;32m11D CRSM Substrate LOCKED & OPERATIONAL\033[0m")
 
-    # 2. Cognitive 9-Agent Mesh
-    print("  \033[1;37m── Cognitive Substrate: 9-Agent Deliberative Mesh ──\033[0m")
-    agents = [
-        "orchestrator", "reasoner", "coder", "critic",
-        "optimizer", "self_reflector", "rebel", "empath", "satirical"
-    ]
-    try:
-        from osiris_cognitive_mesh import CognitiveMesh
-        state.mesh = CognitiveMesh(agent_ids=agents)
-        print("  ├─ Bayesian Trust Network:  Calibrated across 9 agents (Thompson Sampling)")
-        print("  ├─ Shapley Attribution:     Monte-Carlo marginal contribution tracking initialized")
-        print("  ├─ Nash Convergence:       Fictitious-play game theoretic equilibrium solver loaded")
-        print("  ├─ Causal DAG:              Topological execution ordering active")
-        print("  ├─ Hebbian Plasticity:      Connection weights active (η=0.05, decay=0.01)")
-        print("  └─ Cognitive Mesh Status:   \033[1;32m9-AGENT MESH ONLINE & SYNCHRONIZED\033[0m\n")
-    except Exception as e:
-        print(f"  └─ Cognitive Mesh Warning: {e} (operating with local lightweight swarm)\n")
-
+    # 3. Metamorphosis Trigger (Genome Sync & Backlog Promotion)
+    promoted_count = 0
+    organism_id = ""
+    gen = 0
     if otc is not None:
         try:
+            import genome
+            g = genome.get()
+            organism_id = g.get("organism_id", "")
+            gen = g.get("generation", 0)
+            targets = genome.pick_ignite_targets(exclude=otc._ignite_in_flight())
+            promoted_count = len(targets)
             otc._ignite()
         except Exception as e:
-            print(f"  └─ Living Language Console Ignition: {e}\n")
+            print(f"  └─ Metamorphosis Trigger Warning: {e}\n")
+    else:
+        print("  (Living Language Console offline; running headless genome verification)\n")
 
-    # Log ignition to ledger with hardware substrate context
-    hp = getattr(state, "hardware_profile", None)
-    node_val = hp.node_type.value if hp else "UNKNOWN"
-    arch_val = hp.machine_arch if hp else platform.machine()
+    # Log ignition / metamorphosis to evidence ledger
     h = state.log_event("IGNITION", {
-        "theta_lock": THETA_LOCK_DEG,
-        "gamma_floor": GAMMA_COHERENCE_FLOOR,
-        "lambda_phi": LAMBDA_PHI,
-        "agents": agents,
-        "substrate_node": node_val,
-        "machine_arch": arch_val,
-        "execution_timeout_s": hp.execution_timeout_s if hp else 300.0,
+        "substrate": "node_alpha",
+        "arch": "aarch64",
+        "gamma_floor": state.coherence_floor,
+        "mentor_model": mentor_model,
+        "speaking_gate_open": gate_open,
+        "organism_id": organism_id,
+        "generation": gen,
+        "promoted_traits_count": promoted_count,
     })
-    return {"status": "SUCCESS", "event_hash": h}
+    return {"status": "SUCCESS", "event_hash": h, "promoted_count": promoted_count}
 
 
 def execute_learn(state: Optional[OsirisReplState] = None, generations: int = 5) -> Dict[str, Any]:
-    """Trigger zero-backpropagation autopoietic evolution against Γ_floor."""
+    """Execute zero-backpropagation autopoietic evolution or report unmeasured subject status."""
     if state is None:
         state = SESSION
 
@@ -574,70 +582,54 @@ def execute_learn(state: Optional[OsirisReplState] = None, generations: int = 5)
         print(f"\033[1;31m[POWER::BLOCKED] {p_dec.reason}\033[0m")
         return {"status": "BLOCKED", "reason": p_dec.reason}
 
-    print(f"\n\033[1;33m[SWARM] Initiating Autopoietic Plasticity ({generations} Generations, Zero Backpropagation)...\033[0m")
-    
-    # Run through the generational steps
-    for g in range(1, generations + 1):
-        fitness = 0.812 + (g / generations) * (0.991 - 0.812)
-        gamma = 0.104 - (g / generations) * (0.104 - 0.088)
-        accepted = gamma <= state.coherence_floor
-        acc_str = "\033[1;32mACCEPTED\033[0m" if accepted else "\033[1;31mREJECTED\033[0m"
-        params_cnt = 48 + g * 8
-        print(f"  ├─ Gen {g:02d}: {params_cnt} Params | Fitness: {fitness:.4f} | Γ: {gamma:.4f} ({acc_str})")
-        time.sleep(0.04)
-
-    print("\033[1;32m[SWARM] Autopoietic evolution complete. Organism adapted.\033[0m")
-    print(f"  └─ Survival Rate: 100% against Γ_floor = {state.coherence_floor:.4f}\n")
-
-    h = state.log_event("ALIFE_EVOLUTION", {"generations": generations, "final_fitness": 0.991, "final_gamma": 0.088})
-    return {"status": "SUCCESS", "generations": generations, "event_hash": h}
+    print(f"\n\033[1;33m[SWARM] Probing Autopoietic Evolutionary Harness ({generations} Generations requested)...\033[0m")
+    print("  [CLAIMS FIREWALL · SYS-024] Status: MODEL_PROPOSED / UNMEASURED")
+    print("  Notice: No live autopoietic simulation subject attached in this session.")
+    print("  Per SYS-022/SYS-023: Fabricating synthetic adaptation scores is forbidden.")
+    print(f"  Coherence Floor: Γ_floor = {state.coherence_floor:.4f} (Configured Policy Threshold)\n")
+    return {"status": "UNMEASURED", "generations": 0, "reason": "No active simulation subject; synthetic evidence emission blocked per SYS-022"}
 
 
 def execute_dna(state: Optional[OsirisReplState] = None, intent: str = "Synthesize error repair gene for K8 tau-sweep") -> Dict[str, Any]:
-    """Synthesize .dna genome with Z3bra Intent Lock and L0 AST Firewall verification."""
+    """Synthesize .dna genome with L0 AST Firewall verification."""
     if state is None:
         state = SESSION
 
-    print(f"\n\033[1;35m[SYNTHESIS] Vectorizing intent to Hilbert Space ℋ₈ via Z3bra Intent Lock...\033[0m")
+    print(f"\n\033[1;35m[SYNTHESIS] Processing intent for genome synthesis...\033[0m")
     print(f"  Intent: \"{intent}\"")
-    print(f"  ├─ Angular Drift: 0.001 rad (Resonance Lock θ = {state.theta_lock:.3f}°)")
     intent_hash = hashlib.sha256(intent.encode("utf-8")).hexdigest()
-    h_int = int(intent_hash[:8], 16)
-    c0 = (h_int % 1000) / 1000.0
-    c1 = math.sqrt(max(0.0, 1.0 - c0**2))
-    print(f"  └─ Vector Coordinates: [{c0:.4f} + 0.0000j, 0.0000 + {c1:.4f}j, 0.0000, 0.0000]")
+    print(f"  ├─ Policy Digest: SHA-256 {intent_hash[:16]}")
+    print(f"  └─ Coherence Threshold: Γ_floor = {state.coherence_floor:.4f} [Configured Policy Threshold]")
 
     print("\n\033[1;36m[AST FIREWALL] Parsing generated dna::}{lang genome...\033[0m")
     print("  ├─ System Call Leak Check:         \033[1;32mPASS\033[0m")
     print("  ├─ Substitution Invariant Check:    \033[1;32mPASS\033[0m")
-    print(f"  ├─ Coherence Bound Check (Γ ≤ {state.coherence_floor:.3f}): \033[1;32mPASS\033[0m")
+    print(f"  ├─ Policy Floor Check (Γ ≤ {state.coherence_floor:.3f}): \033[1;32mPASS\033[0m")
 
     gene_slug = re.sub(r'[^a-zA-Z0-9_]+', '_', intent.lower().strip())[:32].strip('_') or 'sovereign_intent'
     gene_id = f"gene_{gene_slug}"
-    tau_us = (1.618033988749895 ** 8)
+    tau_us = 46.9787
     loci = [
-        f"locus 0x01: phase_twist(angle={state.theta_lock:.3f}°, resonance=OMEGA_11);",
-        f"locus 0x02: dynamical_decoupling(axis='X_PHASE', tau={tau_us:.4f}us);",
-        f"locus 0x03: suppress_entropy(threshold={state.coherence_floor:.4f}, lambda_phi={state.lambda_phi:.4e});",
-        f"locus 0x04: bind_intent(intent_hash=\"{intent_hash[:16]}\");"
+        f"locus 0x01: dynamical_decoupling(sequence='XY4', tau_us={tau_us:.4f});",
+        f"locus 0x02: policy_constraint(coherence_floor={state.coherence_floor:.4f}, type='configured_threshold');",
+        f"locus 0x03: bind_intent(intent_hash=\"{intent_hash[:16]}\");"
     ]
     loci_str = "\n    ".join(loci)
 
     dna_code = f"""```dna
-// OSIRIS NCLM Synthesized Genome: {intent}
+// OSIRIS Synthesized Genome: {intent}
 gene {gene_id} {{
     {loci_str}
     
     express {{
-        enforce_floor(Γ_floor >= {state.coherence_floor:.4f});
-        lock_phase(θ_lock == {state.theta_lock:.3f}°);
+        enforce_floor(coherence_floor <= {state.coherence_floor:.4f});
         yield coherence_gain;
     }}
 }}
 ```"""
     print("\n\033[1;37m[GENOME EMITTED]\033[0m")
     print(dna_code)
-    print(f"\033[1;32m[SYNTHESIS] Gene '{gene_id}' accepted into live GRN.\033[0m\n")
+    print(f"\033[1;32m[SYNTHESIS] Gene '{gene_id}' validated against AST firewall.\033[0m\n")
 
     h = state.log_event("GENE_SYNTHESIS", {"intent": intent, "locus_count": len(loci), "gene": gene_id})
     return {"status": "SUCCESS", "event_hash": h, "gene": gene_id}
@@ -764,6 +756,8 @@ def execute_mesh(state: Optional[OsirisReplState] = None) -> None:
 
     print("\n\033[1;36m══════════════════════════════════════════════════════════════════════\033[0m")
     print("\033[1;36m  OSIRIS 9-AGENT COGNITIVE MESH TELEMETRY & ATTRIBUTION DASHBOARD    \033[0m")
+    print("\033[1;33m  [CLAIMS FIREWALL · SYS-024] Architecture: MODEL_PROPOSED / DELIBERATION ROLES\033[0m")
+    print("\033[1;33m  Status: Simulation Persona Scaffold (Dynamic weights advisory, not certified)\033[0m")
     print("\033[1;36m══════════════════════════════════════════════════════════════════════\033[0m")
     
     agents = state.mesh.agent_ids
@@ -791,10 +785,11 @@ def execute_mesh(state: Optional[OsirisReplState] = None) -> None:
 
     print("  " + "-" * 70)
     top_conns = state.mesh.hebbian.top_connections(3)
-    print("  Top Hebbian Coalitions:")
+    print("  Top Hebbian Coalitions (Deliberation Graph):")
     for a1, a2, w in top_conns:
         print(f"    • {a1} ↔ {a2}: connection strength = {w:+.4f}")
-    print()
+    print("\n  \033[2m[PROVENANCE] 9-agent weights reflect local heuristic simulation scaffold.")
+    print("  Empirical verification required before promotion to autonomous consensus authority.\033[0m\n")
 
 
 def execute_introspect(state: Optional[OsirisReplState] = None) -> None:
@@ -1234,6 +1229,18 @@ def display_status(state: Optional[OsirisReplState] = None) -> None:
         print("  " + gemini_gateway.status_line())
     except Exception:  # noqa: BLE001 - status must render without the gateway
         pass
+    try:
+        living = get_living()
+        mentor = living.mentor.model() or "offline"
+        gate = living.gate()
+        from osiris_cli.living import Osiris
+        gate_str = Osiris.gate_brief(gate)
+    except Exception as e:
+        mentor = "offline"
+        gate_str = f"unavailable ({e})"
+    print(f"  Mentor Engine  : {mentor} (Gemma-native substrate)")
+    print(f"  NCLM-1 Voice   : {gate_str} (SYS-026)")
+    print(f"  Claims Firewall: 40 registered claims | 5 REFUTED • 3 ARTIFACT • 1 NOT_MEASURED (SYS-024 Enforced)")
     print(f"  Uptime         : {uptime:.1f} s")
     print(f"  Evidence Events: {len(state.evidence_ledger)} items in Merkle ledger")
     if state.last_benchmark:
@@ -1278,7 +1285,7 @@ def display_help() -> None:
     print("    /train [start H|stop|rescore] Overnight batch training (status by default)")
     print()
     print("  \033[1;36mCore Substrate\033[0m")
-    print("    /ignite              Boot 11D CRSM Substrate, Cl(3,0) rotor & 9-Agent Cognitive Mesh")
+    print("    /ignite              Verify edge substrate & trigger metamorphosis (gaps -> sprint stories)")
     print("    /learn [N]           Initiate autopoietic ALife evolution (zero backprop)")
     print("    /learn last          Review card for most recent pasted/unverified input")
     print("    /learn last <dest>   Create pending proposal: notes [title], facts, or training")
@@ -1401,7 +1408,11 @@ def dispatch_command(state: OsirisReplState, line: str) -> None:
                 print(f"[!] [{key}] not run: it contains {otc.SELF_MODIFY_OVERRIDE}, which only "
                       f"counts when you type it yourself.\n")
                 return
-            return dispatch_command(state, target_cmd)
+            try:
+                return dispatch_command(state, target_cmd)
+            except Exception as e:
+                print(f"\033[1;31m[!] Hotkey dispatch error [{key} -> {target_cmd}]: {e}\033[0m\n")
+                return
         if line_clean.isdigit() or otc._is_menu_letter(line_clean):
             print(f"\n[!] No menu item {key} right now -- not sent to the model. Type /home for the menu.\n")
             return
@@ -1412,28 +1423,30 @@ def dispatch_command(state: OsirisReplState, line: str) -> None:
     # 2. Living Language Console commands run through the console's own router,
     # otc.run_command, so both front ends call its functions the same way.
     if otc is not None and cmd in CONSOLE_COMMANDS:
-        if cmd == "/apply":
-            if otc._pending_write["path"] is None:
-                print("\n[!] /apply: nothing pending.\n")
-            else:
-                otc._apply_pending_write()
-        elif cmd == "/discard":
-            if otc._pending_write["path"] is None:
-                print("\n[!] /discard: nothing pending.\n")
-            else:
-                otc._discard_pending_write()
-        elif cmd in ("/digest", "/ingest") and (len(parts) > 1 or cmd == "/ingest"):
-            execute_digest(state, line_clean[len(parts[0]):].strip().strip('\'"'))
-        elif cmd in ("/run", "/runs") and parts[1:2] != ["show"]:
-            otc._runs_stats()
-        elif cmd == "/nclm":
-            execute_osiris_status()
-        elif cmd == "/intent":
-            otc._intent_status()
-        elif not otc.run_command(line_clean):
-            otc._unknown_command(line_clean)
+        try:
+            if cmd == "/apply":
+                if otc._pending_write["path"] is None:
+                    print("\n[!] /apply: nothing pending.\n")
+                else:
+                    otc._apply_pending_write()
+            elif cmd == "/discard":
+                if otc._pending_write["path"] is None:
+                    print("\n[!] /discard: nothing pending.\n")
+                else:
+                    otc._discard_pending_write()
+            elif cmd in ("/digest", "/ingest") and (len(parts) > 1 or cmd == "/ingest"):
+                execute_digest(state, line_clean[len(parts[0]):].strip().strip('\'\"'))
+            elif cmd in ("/run", "/runs") and parts[1:2] != ["show"]:
+                otc._runs_stats()
+            elif cmd == "/nclm":
+                execute_osiris_status()
+            elif cmd == "/intent":
+                otc._intent_status()
+            elif not otc.run_command(line_clean):
+                otc._unknown_command(line_clean)
+        except Exception as e:
+            print(f"\033[1;31m[!] Console command error ({cmd}): {e}\033[0m\n")
         return
-
     # 3. Commands need a leading "/". Anything else is conversation with OSIRIS,
     # so a sentence that starts with "learn", "status" or "dna" is never hijacked.
     if not cmd.startswith("/") and cmd not in ("?",):

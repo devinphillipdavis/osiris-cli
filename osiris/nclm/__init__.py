@@ -11,6 +11,8 @@ from .core.engine import (
     get_nclm,
 )
 
+NCLM = NonCausalLM
+
 from .autograd import Tensor, softmax, log_softmax, gelu, cross_entropy_loss, no_grad
 from .layers import Module, Embedding, Linear, LayerNorm, GELU, Dropout
 from .positions import phase_conjugate_positional_encoding, standard_sinusoidal_positional_encoding
@@ -36,7 +38,7 @@ __all__ = [
     # Legacy NCLM
     "NCPhysics", "ManifoldPoint", "PilotWaveCorrelation",
     "ConsciousnessField", "IntentDeducer", "CodeSwarm",
-    "NonCausalLM", "get_nclm",
+    "NonCausalLM", "NCLM", "get_nclm",
     # Autograd
     "Tensor", "softmax", "log_softmax", "gelu", "cross_entropy_loss", "no_grad",
     # Layers
