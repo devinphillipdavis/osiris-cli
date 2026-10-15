@@ -68,3 +68,23 @@ def test_execute_ignite_truthfulness_and_banner_harmony():
     assert "DELIBERATIVE MESH READY" in output
     assert res["status"] == "SUCCESS"
     assert "event_hash" in res
+
+
+def test_execute_ignite_dry_run():
+    """Verify that execute_ignite with dry_run=True applies zero mutations and does not log events."""
+    state = OsirisReplState()
+    initial_ledger_len = len(state.evidence_ledger)
+    buf = io.StringIO()
+
+    with patch("sys.stdout", buf):
+        res = execute_ignite(state, dry_run=True)
+
+    output = buf.getvalue()
+
+    assert "[IGNITION::DRY-RUN]" in output
+    assert "Edge substrate verified; zero mutations applied." in output
+    assert res["status"] == "DRY_RUN"
+    assert res["verified"] is True
+    assert res["promoted_count"] == 0
+    assert len(state.evidence_ledger) == initial_ledger_len
+    assert state.ignited is False

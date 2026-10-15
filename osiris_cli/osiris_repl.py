@@ -450,7 +450,7 @@ def print_banner():
 # COMMAND PIPELINE: /ignite, /learn, /dna, /ledger
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def execute_ignite(state: Optional[OsirisReplState] = None) -> Dict[str, Any]:
+def execute_ignite(state: Optional[OsirisReplState] = None, dry_run: bool = False) -> Dict[str, Any]:
     """
     Executes the Sovereign Substrate Verification & Metamorphosis Trigger:
       1. Verifies Node Alpha edge hardware, AST firewall, and power envelope.
@@ -462,7 +462,8 @@ def execute_ignite(state: Optional[OsirisReplState] = None) -> Dict[str, Any]:
 
     p_dec = state.power_gov.check()
 
-    print("\n\033[1;36m[IGNITION] Initiating Sovereign Substrate & Metamorphosis Trigger...\033[0m")
+    tag = "[IGNITION::DRY-RUN]" if dry_run else "[IGNITION]"
+    print(f"\n\033[1;36m{tag} Initiating Sovereign Substrate & Metamorphosis Trigger...\033[0m")
     
     # 1. Physical Edge Substrate Verification
     print("  \033[1;37m── Physical Substrate: Node Alpha Mobile Edge (ARM64 / Termux) ──\033[0m")
@@ -489,6 +490,10 @@ def execute_ignite(state: Optional[OsirisReplState] = None) -> Dict[str, Any]:
     print(f"  ├─ NCLM-1 Voice:     {gate_note} [SYS-026]")
     mesh_status = "\033[1;33mSTANDBY (mentor offline)\033[0m" if mentor_model in ("offline", "none reachable") else "\033[1;32mDELIBERATIVE MESH READY\033[0m"
     print(f"  └─ Cognitive Mesh:   {mesh_status}\n")
+ 
+    if dry_run:
+        print("  \033[1;32m[IGNITION::DRY-RUN] Edge substrate verified; zero mutations applied.\033[0m\n")
+        return {"status": "DRY_RUN", "verified": True, "promoted_count": 0}
 
     state.ignited = True
 
@@ -1373,7 +1378,8 @@ def dispatch_command(state: OsirisReplState, line: str) -> None:
         handle_livlm_prompt(state, line_clean)
         return
     if cmd in ("/ignite", "ignite"):
-        execute_ignite(state)
+        dry_run = "--dry-run" in parts
+        execute_ignite(state, dry_run=dry_run)
     elif cmd in ("/learn", "learn"):
         steps = int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else 5
         execute_learn(state, generations=steps)
@@ -1544,13 +1550,18 @@ def main(argv: Optional[List[str]] = None) -> None:
         default=10,
         help="Number of swarm evolutionary steps"
     )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Simulate ignition or execution without state mutations or ledger writes"
+    )
 
     args = parser.parse_args(argv)
 
     if args.action == "update":
         execute_update()
     elif args.action == "ignite":
-        execute_ignite(SESSION)
+        execute_ignite(SESSION, dry_run=args.dry_run)
     elif args.action == "swarm":
         execute_swarm(SESSION, steps=args.steps)
     elif args.action == "mesh":
