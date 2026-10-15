@@ -969,8 +969,9 @@ class Osiris:
         if voice is None:
             model = self.mentor.model()
             if model is None:
+                base_info = getattr(self.mentor, "base", "configured provider")
                 self.out("\nOSIRIS › I can't answer yet: my core hasn't earned its own voice and no "
-                         f"mentor model is reachable at {self.mentor.base}. Start one with `ollama serve`.\n")
+                         f"mentor model is reachable at {base_info}. Configure Gemma or start Ollama (`ollama serve`).\n")
                 self.history.pop()
                 return ""
             fast = getattr(self.mentor, "fast_model", lambda: None)()
