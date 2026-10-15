@@ -370,6 +370,52 @@ Optional sibling checkouts (`~/dnalang-core`, `~/bridge`, `~/organism_sim`, …)
 automatically; other locations can be added with `OSIRIS_EXTRA_PATHS` (path-separated), and
 dnalang-core's ledger with `OSIRIS_DNALANG_LEDGER`. Installed packages always take precedence.
 
+## Evidence retrieval (olmo3-embed-7b)
+
+`/retrieval` (or `osiris retrieval ...` from the shell) ranks scientific abstracts as evidence
+candidates for a claim, using the embedding model
+[petegordon/olmo3-embed-7b](https://huggingface.co/petegordon/olmo3-embed-7b) over BEIR SciFact.
+It supplies ranked evidence and records how it got it. It does not decide whether a claim is
+true, and it writes nothing to the claims register, facts, notes or training data.
+
+```bash
+pip install -e ".[retrieval]"                  # torch, sentence-transformers; Python 3.10+
+osiris retrieval status                        # libraries, hardware policy, dataset, caches, ledger
+osiris retrieval load-scifact                  # mteb/scifact at the revision mteb pins (needs huggingface.co)
+osiris retrieval run --queries 25              # 25 seeded-random test claims (the CPU default)
+osiris retrieval evaluate                      # nDCG@10, MRR@10, Recall@10 vs the model card
+osiris retrieval capsule scifact_olmo3_embed.evidence.zip
+osiris retrieval verify scifact_olmo3_embed.evidence.zip
+osiris retrieval query "statins lower the risk of heart attack"
+```
+
+- **Same setup as the model card's 79.47 nDCG@10.** Queries get MTEB's SciFact instruction
+  (`Instruct: Given a scientific claim, retrieve documents that support or refute the
+  claim\nQuery: `). Documents get no instruction and are formatted as `title + " " + text`.
+  The model runs in bf16 with a 512-token cut. Only the 300 judged test queries are scored;
+  `queries.jsonl` also holds the train claims.
+- **Pilot first.** `evaluate` reports the standard error and a 95% interval. It calls a run
+  comparable with the card only for all 300 queries, the full 5,183-document corpus and the
+  card's model, prompt and dtype. A pilot samples queries at random (seeded) by default:
+  the lowest ids are the claims that start with digits. SciFact is in-domain for this model
+  (its train qrels were training data), so 79.47 is not a zero-shot figure.
+- **Hardware policy.** The 7B model is off on Termux/Android unless you set
+  `OSIRIS_RETRIEVAL_ALLOW_EDGE=1`. Without a GPU it runs in pilot mode: 25 queries unless you
+  pass `--full`, batch size 2, and it needs about 16 GiB of free RAM (`--force` overrides).
+  Embedding the corpus on a CPU takes hours. The embeddings are cached in chunks and an
+  interrupted build resumes. Precomputed document vectors do not make the model usable on a
+  phone, because every query must be embedded by the same model. There, use a small model
+  with `--model` and its own `--query-prompt`.
+- **Evidence.** Each query writes a row to the hash-chained ledger
+  (`~/.osiris/retrieval/ledger.jsonl`). A row holds the model revision, the instruction's
+  SHA-256, the ranked doc ids, the scores and the latency; free-text queries are stored as
+  hashes. A capsule holds the config, queries, qrels, rankings, metrics, the run's ledger
+  rows and a summary. `verify` recomputes the digests, the metrics and the chain. Capsules
+  are unsigned: verification shows internal consistency, not authorship.
+- **Status.** The code path is tested with a tiny random-weight Olmo3 model of the same
+  layout. No score with the real weights has been recorded in this repository yet.
+  `OSIRIS_TEST_OLMO3_EMBED=1 pytest tests/test_olmo_retrieval.py` runs the real-weight tests.
+
 ## Related, separately published work
 
 - **organism_sim / dnalang-core / bridge** — pre-registered ALife and dynamical-decoupling
