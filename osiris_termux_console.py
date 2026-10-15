@@ -2851,7 +2851,7 @@ def _experiments():
                                                                  "brief (text only). Nothing here has been run.")]) + "\n")
 
 
-def _facts():
+def _facts(command: str = ""):
     ui = osiris_ui.Canvas()
     print("\n" + ui.panel("VERIFIED FACTS (what answers are grounded in)",
                           [f"{ui.marker('verified')} {f}" for f in _grounded_facts()]) + "\n")
@@ -2923,7 +2923,7 @@ HELP_SECTIONS = (
 )
 
 
-def _mentors():
+def _mentors(command: str = ""):
     """'/mentors': protege.py's scorecard and routing, from the verified bench
     ledger only. Read-only; changes no backend order."""
     import protege
@@ -3836,7 +3836,7 @@ _PROVENANCE_RE = re.compile(r"\[PROVENANCE:\s*([A-Z_]+)\]")
 _NUMERIC_DATA_RE = re.compile(r"=\s*-?\d")
 
 
-def _consensus(n: int = 15):
+def _consensus(n=15):
     """'/consensus': a fast, local, honest cross-reference of recent activity
     against the provenance ledger -- NOT the real 9-persona cognitive_mesh.py
     deliberation system (deliberately not invoked here: running that on every
@@ -3844,6 +3844,14 @@ def _consensus(n: int = 15):
     known local-model latency). Pure file reads, no LLM/network calls, so this
     completes in well under a second by design -- that's the whole point of
     making it on-demand instead of automatic."""
+    if isinstance(n, str):
+        parts = n.split()
+        if len(parts) > 1 and parts[1].isdigit():
+            n = int(parts[1])
+        else:
+            n = 15
+    elif not isinstance(n, int):
+        n = 15
     logs = [
         ("Engine 3 / telemetry", TELEMETRY_LOG),
         ("DD search", os.path.join(TELEMETRY_HOME, "dd_search.log")),
@@ -5746,6 +5754,60 @@ def main():
         except (KeyboardInterrupt, EOFError):
             print("\n[*] Session terminated.")
             break
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# REPL & TERMINAL BRIDGE METHODS
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def _intent(command: str = ""):
+    """Bridge for /intent commands."""
+    _intent_status()
+
+
+def _runs(command: str = ""):
+    """Bridge for /runs: differentiates show vs stats."""
+    if "show" in command:
+        _run_show(command)
+    else:
+        _runs_stats()
+
+
+def _apply(command: str = ""):
+    """Bridge for /apply: applies pending write."""
+    _apply_pending_write()
+
+
+def _discard(command: str = ""):
+    """Bridge for /discard: discards pending write."""
+    _discard_pending_write()
+
+
+def _organism(command: str = ""):
+    """Bridge for /organism: routes alerts vs status."""
+    parts = command.split()
+    if len(parts) > 1 and parts[1].lower() == "alerts":
+        n = int(parts[2]) if len(parts) > 2 and parts[2].isdigit() else 10
+        _organism_alerts(n=n)
+    else:
+        _organism_status()
+
+
+def _sprint(command: str = ""):
+    """Bridge for /sprint: routes plan, execute, review."""
+    parts = command.split()
+    sub = parts[1].lower() if len(parts) > 1 else ""
+    if sub == "execute":
+        _sprint_execute(command)
+    elif sub == "review":
+        _sprint_review()
+    else:
+        _sprint_plan(command)
+
+
+def _nclm(command: str = ""):
+    """Bridge for /nclm: routes to _organism_status()."""
+    _organism_status()
+
 
 if __name__ == "__main__":
     main()
