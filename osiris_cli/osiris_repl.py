@@ -1257,102 +1257,114 @@ def dispatch_command(state: OsirisReplState, line: str) -> None:
         upper_k = line_clean.upper()
         if upper_k in otc._pending_suggestions:
             target_cmd = otc._pending_suggestions[upper_k]
-            return dispatch_command(state, target_cmd)
+            try:
+                return dispatch_command(state, target_cmd)
+            except Exception as e:
+                print(f"\033[1;31m[!] Hotkey dispatch error [{upper_k} -> {target_cmd}]: {e}\033[0m")
+                return
         elif line_clean in otc._pending_suggestions:
             target_cmd = otc._pending_suggestions[line_clean]
-            return dispatch_command(state, target_cmd)
+            try:
+                return dispatch_command(state, target_cmd)
+            except Exception as e:
+                print(f"\033[1;31m[!] Hotkey dispatch error [{line_clean} -> {target_cmd}]: {e}\033[0m")
+                return
 
     parts = line_clean.split()
     cmd = parts[0].lower()
 
     # 2. Living Language Console & Termux Routing
     if otc is not None:
-        if cmd == "/home":
-            otc._home()
-            return
-        elif cmd == "/why":
-            otc._why()
-            return
-        elif cmd in ("/bench", "/mentors") or (cmd == "/benchmark" and len(parts) > 1 and parts[1].lower() in ("run", "runs", "tasks", "compare", "leaderboard")):
-            if cmd.startswith("/mentor"):
-                otc._mentors(line_clean)
-            else:
-                otc._bench(line_clean)
-            return
-        elif cmd == "/run" and len(parts) > 1 and parts[1].lower() == "show":
-            otc._run_show(line_clean)
-            return
-        elif cmd in ("/runs", "/run"):
-            otc._runs(line_clean)
-            return
-        elif cmd == "/apply":
-            otc._apply(line_clean)
-            return
-        elif cmd == "/discard":
-            otc._discard(line_clean)
-            return
-        elif cmd in ("/gap", "/gaps"):
-            otc._gap(line_clean)
-            return
-        elif cmd in ("/experiment", "/experiments"):
-            otc._experiment(line_clean)
-            return
-        elif cmd == "/lab":
-            otc._lab(line_clean)
-            return
-        elif cmd == "/sources":
-            otc._sources(line_clean)
-            return
-        elif cmd == "/hypotheses":
-            otc._hypotheses(line_clean)
-            return
-        elif cmd == "/organism":
-            otc._organism(line_clean)
-            return
-        elif cmd == "/ui":
-            otc._ui(line_clean)
-            return
-        elif cmd == "/sprint":
-            otc._sprint(line_clean)
-            return
-        elif cmd == "/reroute":
-            otc._reroute(line_clean)
-            return
-        elif cmd == "/focus":
-            otc._focus(line_clean)
-            return
-        elif cmd == "/suggest":
-            otc._suggest(line_clean)
-            return
-        elif cmd == "/digest":
-            parts = line_clean.split(maxsplit=1)
-            if len(parts) > 1 and parts[1].strip():
-                execute_digest(state, parts[1].strip())
-            else:
-                otc._digest()
-            return
-        elif cmd == "/ingest":
-            parts = line_clean.split(maxsplit=1)
-            filepath = parts[1].strip() if len(parts) > 1 else ""
-            execute_digest(state, filepath)
-            return
-        elif cmd == "/facts":
-            otc._facts(line_clean)
-            return
-        elif cmd == "/plan":
-            otc._plan(line_clean)
-            return
-        elif cmd == "/consensus":
-            otc._consensus(line_clean)
-            return
-        elif cmd == "/check":
-            otc._check()
-            return
-        elif cmd == "/nclm":
-            otc._nclm(line_clean)
-            return
-        elif cmd == "/intent":
-            otc._intent(line_clean)
+        try:
+            if cmd == "/home":
+                otc._home()
+                return
+            elif cmd == "/why":
+                otc._why()
+                return
+            elif cmd in ("/bench", "/mentors") or (cmd == "/benchmark" and len(parts) > 1 and parts[1].lower() in ("run", "runs", "tasks", "compare", "leaderboard")):
+                if cmd.startswith("/mentor"):
+                    otc._mentors(line_clean)
+                else:
+                    otc._bench(line_clean)
+                return
+            elif cmd == "/run" and len(parts) > 1 and parts[1].lower() == "show":
+                otc._run_show(line_clean)
+                return
+            elif cmd in ("/runs", "/run"):
+                otc._runs(line_clean)
+                return
+            elif cmd == "/apply":
+                otc._apply(line_clean)
+                return
+            elif cmd == "/discard":
+                otc._discard(line_clean)
+                return
+            elif cmd in ("/gap", "/gaps"):
+                otc._gap(line_clean)
+                return
+            elif cmd in ("/experiment", "/experiments"):
+                otc._experiment(line_clean)
+                return
+            elif cmd == "/lab":
+                otc._lab(line_clean)
+                return
+            elif cmd == "/sources":
+                otc._sources(line_clean)
+                return
+            elif cmd == "/hypotheses":
+                otc._hypotheses(line_clean)
+                return
+            elif cmd == "/organism":
+                otc._organism(line_clean)
+                return
+            elif cmd == "/ui":
+                otc._ui(line_clean)
+                return
+            elif cmd == "/sprint":
+                otc._sprint(line_clean)
+                return
+            elif cmd == "/reroute":
+                otc._reroute(line_clean)
+                return
+            elif cmd == "/focus":
+                otc._focus(line_clean)
+                return
+            elif cmd == "/suggest":
+                otc._suggest(line_clean)
+                return
+            elif cmd == "/digest":
+                parts = line_clean.split(maxsplit=1)
+                if len(parts) > 1 and parts[1].strip():
+                    execute_digest(state, parts[1].strip())
+                else:
+                    otc._digest()
+                return
+            elif cmd == "/ingest":
+                parts = line_clean.split(maxsplit=1)
+                filepath = parts[1].strip() if len(parts) > 1 else ""
+                execute_digest(state, filepath)
+                return
+            elif cmd == "/facts":
+                otc._facts(line_clean)
+                return
+            elif cmd == "/plan":
+                otc._plan(line_clean)
+                return
+            elif cmd == "/consensus":
+                otc._consensus(line_clean)
+                return
+            elif cmd == "/check":
+                otc._check()
+                return
+            elif cmd == "/nclm":
+                otc._nclm(line_clean)
+                return
+            elif cmd == "/intent":
+                otc._intent(line_clean)
+                return
+        except Exception as e:
+            print(f"\033[1;31m[!] Console command error ({cmd}): {e}\033[0m")
             return
 
     # 3. Commands need a leading "/". Anything else is conversation with OSIRIS,
