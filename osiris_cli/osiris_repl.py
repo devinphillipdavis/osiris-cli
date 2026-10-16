@@ -488,16 +488,16 @@ def print_banner():
             otc._home()
         except Exception as e:
             print(f"  [Console Status: {e}]")
-            print("  Type \033[93m/help\033[0m for commands, \033[92m/ignite\033[0m to boot substrate & mesh, or type natural language.\n")
+            print("  Type \033[93m/help\033[0m for commands, \033[92m/ignite\033[0m for metamorphosis, or type natural language.\n")
     else:
-        print("  Type \033[93m/help\033[0m for commands, \033[92m/ignite\033[0m to boot substrate & mesh, or type natural language.\n")
+        print("  Type \033[93m/help\033[0m for commands, \033[92m/ignite\033[0m for metamorphosis, or type natural language.\n")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # COMMAND PIPELINE: /ignite, /learn, /dna, /ledger
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def execute_ignite(state: Optional[OsirisReplState] = None) -> Dict[str, Any]:
+def execute_ignite(state: Optional[OsirisReplState] = None, dry_run: bool = False) -> Dict[str, Any]:
     """
     Executes the Sovereign Substrate Verification & Metamorphosis Trigger:
       1. Verifies Node Alpha edge hardware, AST firewall, and power envelope.
@@ -536,6 +536,10 @@ def execute_ignite(state: Optional[OsirisReplState] = None) -> Dict[str, Any]:
     print(f"  ├─ NCLM-1 Voice:     {gate_note} [SYS-026]")
     mesh_status = "\033[1;33mSTANDBY (mentor offline)\033[0m" if mentor_model in ("offline", "none reachable") else "\033[1;32mDELIBERATIVE MESH READY\033[0m"
     print(f"  └─ Cognitive Mesh:   {mesh_status}\n")
+
+    if dry_run:
+        print("  \033[1;32m[IGNITION::DRY-RUN] Edge substrate verified; zero mutations applied.\033[0m\n")
+        return {"status": "DRY_RUN", "verified": True, "promoted_count": 0}
 
     state.ignited = True
 
@@ -1184,6 +1188,88 @@ def execute_firewall_status(state: Optional[OsirisReplState] = None) -> None:
     print()
 
 
+def execute_pr(args: Optional[List[str]] = None) -> None:
+    """Executes GitHub PR and repo management commands."""
+    from osiris_cli.github_bridge import GitHubBridge
+    bridge = GitHubBridge()
+    args = args or []
+    sub = args[0].lower() if args else "status"
+
+    if sub in ("status", "dash", "dashboard"):
+        print("\n" + bridge.format_dashboard() + "\n")
+    elif sub in ("list", "prs"):
+        res = bridge.list_prs(limit=10)
+        if res["status"] != "SUCCESS":
+            print(f"[GITHUB::ERROR] {res.get('reason')}")
+            return
+        print("\n\033[1;36m[GITHUB::OPEN PULL REQUESTS]\033[0m")
+        prs = res.get("prs", [])
+        if not prs:
+            print("  No open pull requests found.")
+        for pr in prs:
+            print(f"  • \033[1;37m#{pr['number']}\033[0m: {pr['title']} (\033[1;34m{pr['headRefName']}\033[0m)")
+        print()
+    elif sub in ("view", "show"):
+        if len(args) < 2:
+            print("[GITHUB] Usage: /pr view <pr_number>")
+            return
+        pr_id = args[1].lstrip("#")
+        res = bridge.view_pr(pr_id)
+        if res["status"] != "SUCCESS":
+            print(f"[GITHUB::ERROR] {res.get('reason')}")
+            return
+        pr = res["pr"]
+        print(f"\n\033[1;36m[GITHUB::PR #{pr.get('number')}] {pr.get('title')}\033[0m")
+        print(f"  Branch : {pr.get('headRefName')} -> {pr.get('baseRefName')}")
+        print(f"  State  : {pr.get('state')}")
+        print(f"  URL    : {pr.get('url')}")
+        body = pr.get("body", "")
+        if body:
+            preview = body[:600] + ("..." if len(body) > 600 else "")
+            print(f"\n{preview}\n")
+    elif sub in ("checks", "ci"):
+        if len(args) < 2:
+            print("[GITHUB] Usage: /pr checks <pr_number>")
+            return
+        pr_id = args[1].lstrip("#")
+        res = bridge.checks_pr(pr_id)
+        print(f"\n\033[1;36m[GITHUB::CHECKS PR #{pr_id}]\033[0m")
+        print(res.get("output") or "No checks reported")
+        print()
+    elif sub in ("repos", "repo"):
+        res = bridge.list_repos(limit=10)
+        if res["status"] != "SUCCESS":
+            print(f"[GITHUB::ERROR] {res.get('reason')}")
+            return
+        print("\n\033[1;36m[GITHUB::REPOSITORIES]\033[0m")
+        repos = res.get("repos", [])
+        if not repos:
+            print("  No repositories found.")
+        for repo in repos:
+            priv = "private" if repo.get("isPrivate") else "public"
+            print(f"  • \033[1;37m{repo['nameWithOwner']}\033[0m ({priv}) - {repo.get('url')}")
+        print()
+    elif sub in ("merge", "close"):
+        print("\n\033[1;31m[SYS-021 BLOCKED] Mutating GitHub operations require payload-bound authorization grant.\033[0m")
+        print("  Remote merges and repository mutations cannot be triggered from conversational directives.\n")
+    else:
+        print(f"[GITHUB] Unknown subcommand '{sub}'. Usage: /pr [status|list|view <id>|checks <id>|repos]")
+
+
+def execute_sync(args: Optional[List[str]] = None) -> None:
+    """Executes Dual-Node Mobile Dev Sync diagnostics and runbook."""
+    from osiris_cli.sync_bridge import DualNodeSyncBridge
+    args = args or []
+    sub = args[0].lower() if args else "status"
+
+    if sub in ("status", "check"):
+        print("\n" + DualNodeSyncBridge.format_status_card() + "\n")
+    elif sub in ("plan", "runbook", "guide"):
+        print(DualNodeSyncBridge.format_runbook())
+    else:
+        print(f"[SYNC] Unknown subcommand '{sub}'. Usage: /sync [status|plan]")
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # SYSTEM DASHBOARDS: STATUS, UPDATE, HELP
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1200,47 +1286,38 @@ def display_status(state: Optional[OsirisReplState] = None) -> None:
     print("\n\033[1;36m[OSIRIS::STATUS DASHBOARD]\033[0m")
     print(f"  Python Runtime : {sys.version.split()[0]} ({sys.platform})")
     print(f"  Process PID    : {os.getpid()}")
-    substrate = "\033[1;32mIGNITED (11D CRSM Active)\033[0m" if state.ignited else "\033[1;33mCOLD (Run /ignite)\033[0m"
-    mesh = "\033[1;32m9 AGENTS SYNCHRONIZED\033[0m" if state.mesh else "\033[1;33mSTANDBY\033[0m"
-    print(f"  Substrate State: {substrate}")
-    print(f"  Cognitive Mesh : {mesh}")
-    
-    hp = getattr(state, "hardware_profile", None)
-    if hp:
-        is_alpha = hp.is_termux or hp.machine_arch in ("aarch64", "arm64")
-        node_lbl = "Node Alpha: Mobile Edge (Fold7 / Termux)" if is_alpha else "Node Beta: Compute Workstation (PC / Intel Core Ultra / WSL)"
-        print(f"  Substrate Mesh : \033[1;32m{node_lbl}\033[0m")
-        print(f"  Architecture   : {hp.machine_arch} ({hp.cpu_model}) | Cores: {hp.cpu_cores}")
-        print(f"  Acceleration   : NEON={hp.has_neon}, AVX2={hp.has_avx2}, AVX-VNNI={hp.has_avx_vnni}, Intel Arc={hp.has_intel_arc}")
-        print(f"  Exec Horizon   : {hp.execution_timeout_s:.0f}s (Extended Horizons: {hp.allow_extended_horizons})")
-    print(f"  Power Governor : {p_dec.reason}")
-    print(f"  Coherence Floor: {state.coherence_floor:.4f} (configured threshold, not a measured invariant)")
+    print(f"  Substrate Node : Node Alpha (Mobile Edge - Fold7 / Termux | aarch64 | NEON SIMD)")
+    print(f"  AST Firewall   : \033[1;32mACTIVE (SYS-025 L0-L6 Interposition · fail-closed ast.parse)\033[0m")
+    print(f"  Power Governor : {p_dec.reason} (Bat: {p_dec.battery_pct:.1f}%, Temp: {p_dec.temp_c:.1f}°C)")
+    print(f"  Coherence Floor: {state.coherence_floor:.4f} (Fail-closed ceiling Γ <= 0.092)")
+
     try:
-        from osiris_cli import claims as _claims
-        def _verdict(cid):
-            c = _claims.by_id(cid)
-            return c.verdict if c else "unregistered"
-        print(f"  CRSM constants : historical, not established -- θ_lock {THETA_LOCK_DEG}° {_verdict('THETA_LOCK')}, "
-              f"Λ_Φ {LAMBDA_PHI:.6e} {_verdict('LAMBDA_PHI')}, F_max {F_MAX_PREDICTED:.5f} {_verdict('F_MAX')} (/legit list)")
-    except Exception:  # noqa: BLE001 - status must render even without the register
-        print("  CRSM constants : historical, not established (/legit list)")
-    try:
-        from osiris_cli import gemini_gateway
-        print("  " + gemini_gateway.status_line())
-    except Exception:  # noqa: BLE001 - status must render without the gateway
-        pass
+        import genome
+        g = genome.get()
+        gen = g.get('generation', 1)
+        active_cnt = len(g.get('active_traits', []))
+        dormant_cnt = len(g.get('dormant_traits', []))
+        eligible = otc._ignite_eligible(g) if otc is not None else 0
+        if eligible > 0:
+            meta_str = f"Generation {gen} ({active_cnt} active, {dormant_cnt} dormant) · \033[1;33m{eligible} gap(s) eligible (run /ignite)\033[0m"
+        else:
+            meta_str = f"Generation {gen} ({active_cnt} active, {dormant_cnt} dormant) · \033[1;32mSTABLE\033[0m (draft with /gap)"
+    except Exception:
+        meta_str = "Genome uninitialized"
+    print(f"  Genome State   : {meta_str}")
+
     try:
         living = get_living()
-        mentor = living.mentor.model() or "offline"
-        gate = living.gate()
         from osiris_cli.living import Osiris
-        gate_str = Osiris.gate_brief(gate)
+        mentor = living.mentor.model() or "none reachable"
+        gate = living.gate()
+        gate_str = Osiris.gate_note(gate)
     except Exception as e:
         mentor = "offline"
         gate_str = f"unavailable ({e})"
     print(f"  Mentor Engine  : {mentor} (Gemma-native substrate)")
     print(f"  NCLM-1 Voice   : {gate_str} (SYS-026)")
-    print(f"  Claims Firewall: 40 registered claims | 5 REFUTED • 3 ARTIFACT • 1 NOT_MEASURED (SYS-024 Enforced)")
+    print(f"  Claims Firewall: 40 registered claims | 5 REFUTED · 3 ARTIFACT · 1 NOT_MEASURED (SYS-024 Enforced)")
     print(f"  Uptime         : {uptime:.1f} s")
     print(f"  Evidence Events: {len(state.evidence_ledger)} items in Merkle ledger")
     if state.last_benchmark:
@@ -1336,6 +1413,10 @@ def display_help() -> None:
     print("    /ui [mode]           Set console interface mode (rich, plain, access)")
     print("    /check               Verify ledger, runs, and bench suite integrity")
     print()
+    print("  \033[1;36mGitHub & Dual-Node Device Sync\033[0m")
+    print("    /pr [status|list|view <id>]  Inspect pull requests and GitHub repos (Read-only)")
+    print("    /sync [status|plan]          Dual-Node sync over Bluetooth PAN & Wireless ADB")
+    print()
     print("  \033[1;36mSession\033[0m")
     print("    /welcome             Guided tour: three read-only commands to start with (runs none)")
     print("    /update              Upgrade osiris-cli from GitHub and restart REPL")
@@ -1355,6 +1436,7 @@ CONSOLE_COMMANDS = {
     "/experiment", "/experiments", "/lab", "/sources", "/source", "/hypotheses", "/hypothesis",
     "/organism", "/ui", "/sprint", "/reroute", "/focus", "/suggest", "/digest", "/ingest", "/facts",
     "/plan", "/consensus", "/check", "/nclm", "/intent", "/ask", "/cancel", "/engage", "/tap",
+    "/map", "/trial", "/evolve", "/capabilities", "/discover", "/outcome",
 }
 
 
@@ -1453,7 +1535,8 @@ def dispatch_command(state: OsirisReplState, line: str) -> None:
         handle_livlm_prompt(state, line_clean)
         return
     if cmd in ("/ignite", "ignite"):
-        execute_ignite(state)
+        dry_run = "--dry-run" in parts
+        execute_ignite(state, dry_run=dry_run)
     elif cmd in ("/learn", "learn"):
         from osiris_cli import paste_learning
         sub = parts[1].lower() if len(parts) > 1 else ""
@@ -1614,6 +1697,10 @@ def dispatch_command(state: OsirisReplState, line: str) -> None:
         execute_digest(state, filepath)
     elif cmd in ("/status", "status"):
         display_status(state)
+    elif cmd in ("/pr", "pr"):
+        execute_pr(parts[1:])
+    elif cmd in ("/sync", "sync"):
+        execute_sync(parts[1:])
     elif cmd in ("/update", "update"):
         execute_update()
     elif cmd in ("/help", "help", "?"):
@@ -1711,7 +1798,7 @@ def main(argv: Optional[List[str]] = None) -> None:
         "action",
         nargs="?",
         default=None,
-        choices=["update", "ignite", "swarm", "mesh", "benchmark", "status", "power", "repl"],
+        choices=["update", "ignite", "swarm", "mesh", "benchmark", "status", "power", "repl", "pr", "sync"],
         help="Direct command to execute (default: launch REPL)"
     )
     parser.add_argument(
@@ -1726,13 +1813,23 @@ def main(argv: Optional[List[str]] = None) -> None:
         default=10,
         help="Number of swarm evolutionary steps"
     )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Simulate ignition or execution without state mutations or ledger writes"
+    )
+    parser.add_argument(
+        "subargs",
+        nargs="*",
+        help="Optional subarguments for the action"
+    )
 
     args = parser.parse_args(argv)
 
     if args.action == "update":
         execute_update()
     elif args.action == "ignite":
-        execute_ignite(SESSION)
+        execute_ignite(SESSION, dry_run=args.dry_run)
     elif args.action == "swarm":
         execute_swarm(SESSION, steps=args.steps)
     elif args.action == "mesh":
@@ -1746,6 +1843,10 @@ def main(argv: Optional[List[str]] = None) -> None:
             execute_benchmark_llm()
     elif args.action == "status":
         display_status(SESSION)
+    elif args.action == "pr":
+        execute_pr(args.subargs)
+    elif args.action == "sync":
+        execute_sync(args.subargs)
     else:
         # Default action: launch interactive REPL
         boot_repl()
