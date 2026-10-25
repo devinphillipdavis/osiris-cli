@@ -124,27 +124,16 @@ class Ledger:
     def __init__(self, path=None):
         self.path = path or LEDGER_PATH
 
-    def _tip(self):
-        tip = GENESIS
-        try:
-            for line in open(self.path, encoding="utf-8"):
-                if line.strip():
-                    tip = json.loads(line)["hash"]
-        except OSError:
-            pass
-        return tip
-
     def append(self, kind, payload):
-        os.makedirs(os.path.dirname(self.path), exist_ok=True)
-        entry = {"kind": kind, "payload": payload, "prev": self._tip(),
-                 "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
-        entry["hash"] = _sha(_canon({k: entry[k] for k in ("kind", "payload", "prev", "ts")}))
-        fd = os.open(self.path, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o600)
-        with os.fdopen(fd, "a", encoding="utf-8") as f:
-            f.write(json.dumps(entry) + "\n")
-            f.flush()
-            os.fsync(f.fileno())
-        return entry
+        from osiris_cli import chain_lock
+
+        def build(last):
+            entry = {"kind": kind, "payload": payload, "prev": last["hash"] if last else GENESIS,
+                     "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
+            entry["hash"] = _sha(_canon({k: entry[k] for k in ("kind", "payload", "prev", "ts")}))
+            return entry
+
+        return chain_lock.append_chained(self.path, build)
 
     def verify(self):
         prev = GENESIS

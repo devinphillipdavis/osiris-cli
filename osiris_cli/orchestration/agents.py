@@ -239,30 +239,17 @@ class MemoryLineageAgent:
 
     def record_event(self, event_type: str, payload: Dict[str, Any]) -> str:
         """Append event to hash-chained JSONL ledger."""
-        os.makedirs(os.path.dirname(self.ledger_file), exist_ok=True)
-        prev_hash = "0" * 64
+        from osiris_cli import chain_lock
 
-        if os.path.exists(self.ledger_file):
-            try:
-                with open(self.ledger_file, "r", encoding="utf-8") as f:
-                    lines = [ln.strip() for ln in f if ln.strip()]
-                    if lines:
-                        last_entry = json.loads(lines[-1])
-                        prev_hash = last_entry.get("hash", prev_hash)
-            except Exception:
-                pass
+        def build(last):
+            entry_body = {
+                "event_type": event_type,
+                "timestamp": time.time(),
+                "payload": payload,
+                "prev_hash": last["hash"] if last else "0" * 64,
+            }
+            canonical_str = json.dumps(entry_body, sort_keys=True)
+            entry_body["hash"] = hashlib.sha256(canonical_str.encode("utf-8")).hexdigest()
+            return entry_body
 
-        entry_body = {
-            "event_type": event_type,
-            "timestamp": time.time(),
-            "payload": payload,
-            "prev_hash": prev_hash,
-        }
-        canonical_str = json.dumps(entry_body, sort_keys=True)
-        curr_hash = hashlib.sha256(canonical_str.encode("utf-8")).hexdigest()
-        entry_body["hash"] = curr_hash
-
-        with open(self.ledger_file, "a", encoding="utf-8") as f:
-            f.write(json.dumps(entry_body) + "\n")
-
-        return curr_hash
+        return chain_lock.append_chained(self.ledger_file, build)["hash"]

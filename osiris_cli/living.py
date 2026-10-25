@@ -539,22 +539,6 @@ def score_rank(score: list) -> tuple:
     return scorer_of(score), score[2]
 
 
-def _lock(f) -> None:
-    try:
-        import fcntl
-        fcntl.flock(f.fileno(), fcntl.LOCK_EX)
-    except (ImportError, OSError):     # no flock (e.g. Windows): single-writer behaviour as before
-        pass
-
-
-def _unlock(f) -> None:
-    try:
-        import fcntl
-        fcntl.flock(f.fileno(), fcntl.LOCK_UN)
-    except (ImportError, OSError):
-        pass
-
-
 def _last_hash(f, block: int = 65536) -> Optional[str]:
     """The "hash" of the last non-empty line of an open binary file, read backwards in blocks (a line can be a
     100k-character paste). None for an empty file; None also if the last line is not JSON (the caller falls back)."""
@@ -822,18 +806,17 @@ class Osiris:
     def _record(self, entry: dict) -> str:
         """Append one exchange, chained to the ledger's actual last entry. The previous hash is read from the file
         under an exclusive lock, not from this process's stats: on 2026-10-07 two consoles appended from their own
-        in-memory heads and the chain forked seven times (entries intact, links crossed)."""
-        with open(self.log_path, "ab+") as f:
-            _lock(f)
-            try:
-                entry["prev"] = _last_hash(f) or self.stats.get("last_head") or "0" * 64
-                body = json.dumps(entry, sort_keys=True, ensure_ascii=False)
-                entry["hash"] = hashlib.sha256(body.encode()).hexdigest()
-                f.seek(0, os.SEEK_END)
-                f.write((json.dumps(entry, ensure_ascii=False) + "\n").encode("utf-8"))
-                f.flush()
-            finally:
-                _unlock(f)
+        in-memory heads and the chain forked seven times (entries intact, links crossed). An unreadable last entry
+        raises chain_lock.ChainTailError instead of falling back to the in-memory head, which would fork again."""
+        from osiris_cli import chain_lock
+
+        def build(last):
+            entry["prev"] = last["hash"] if last else "0" * 64
+            body = json.dumps(entry, sort_keys=True, ensure_ascii=False)
+            entry["hash"] = hashlib.sha256(body.encode()).hexdigest()
+            return entry
+
+        chain_lock.append_chained(self.log_path, build, ensure_ascii=False)
         self.stats["last_head"] = entry["hash"]
         return entry["hash"]
 
