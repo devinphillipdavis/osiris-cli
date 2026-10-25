@@ -211,11 +211,13 @@ def _gcp_token():
     if not exe:
         return ""
     try:
-        out = subprocess.run([exe, "auth", "print-access-token"], capture_output=True, text=True, timeout=30)
+        out = subprocess.run([exe, "auth", "print-access-token"], capture_output=True, text=True, timeout=10)
     except (OSError, subprocess.SubprocessError):
-        return ""
-    tok = out.stdout.strip() if out.returncode == 0 else ""
-    _TOKEN.update(value=tok, until=time.time() + 45 * 60 if tok else 0.0)
+        out = None
+    tok = out.stdout.strip() if (out and out.returncode == 0) else ""
+    # Cache valid token for 45 minutes; cache failure for 30s to prevent hanging every turn
+    ttl = 45 * 60 if tok else 30.0
+    _TOKEN.update(value=tok, until=time.time() + ttl)
     return tok
 
 
@@ -223,9 +225,17 @@ def backend_key(backend, env):
     """The key that works on this backend. Developer API keys look like 'AIza...'; Vertex
     express / agent-platform keys look like 'AQ....' and are rejected by the Developer API
     (401), so an AQ-type GEMINI_API_KEY is used on Vertex instead."""
-    if backend == "vertex-project":
-        return "gcloud" if gcp_settings(env)[0] and _gcloud() else ""     # the token is fetched at send time
     gem, goog = _key("GEMINI_API_KEY", env), _key("GOOGLE_API_KEY", env)
+    if backend == "vertex-project":
+        if not (gcp_settings(env)[0] and _gcloud()):
+            return ""
+        # When an explicit backend is requested or a valid token exists, vertex-project is selected.
+        # If gcloud has no active login token, auto-selection falls through to API keys if available.
+        has_other_key = any(k for k in (gem, goog) if k)
+        wanted = os.environ.get("OSIRIS_GEMINI_BACKEND", "").strip()
+        if _gcp_token() or not has_other_key or wanted == "vertex-project":
+            return "gcloud"
+        return ""
     if backend == "developer":
         return next((k for k in (gem, goog) if k.startswith("AIza")), "")
     return next((k for k in (goog, gem) if k and not k.startswith("AIza")), "")
