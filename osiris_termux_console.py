@@ -76,7 +76,7 @@ def _load_dotenv():
 
 _load_dotenv()
 
-OLLAMA_GEN_URL = "http://localhost:11434/api/generate"
+OLLAMA_GEN_URL = (os.environ.get("OLLAMA_HOST", "").strip() or "http://localhost:11434").rstrip("/") + "/api/generate"
 CHAT_MODEL = os.environ.get("OSIRIS_CHAT_MODEL", "gemma-3-1b")
 CODE_MODEL = os.environ.get("OSIRIS_CODE_MODEL", "gemma-3-1b")
 
