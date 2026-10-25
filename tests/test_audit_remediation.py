@@ -3,7 +3,7 @@ Unit test suite verifying remediation of Node Alpha audit findings:
 1. Mentor round reachability preflight & scorecard integrity exclusions (no infrastructure failures scored as model fails).
 2. NBA (Next Best Action) reachability guard preventing recommendations of unreachable backends.
 3. Claims Firewall compliance on /mesh (SYS-024).
-4. PowerGovernor fail-open mode and ledger event logging.
+4. PowerGovernor sensor outage (fail-closed when unattended) and ledger event logging.
 5. runpy RuntimeWarning elimination via lazy loading.
 6. Organism baseline dual-reporting (nats and bpb vs unigram baseline).
 """
@@ -86,23 +86,24 @@ def test_mesh_enforces_sys024_claims_firewall(capsys):
     assert "Empirical verification required" in out
 
 
-def test_power_governor_fail_open_and_ledger_event():
-    """Verify PowerGovernor reports fail-open mode and logs POWER_SENSOR_OUTAGE to evidence ledger."""
+def test_power_governor_sensor_outage_and_ledger_event():
+    """An unreadable sensor reports unknown readings, allows attended work, refuses unattended
+    work, and logs POWER_SENSOR_OUTAGE once to the evidence ledger."""
     SESSION.evidence_ledger.clear()
-    
+
     with patch("subprocess.run", side_effect=Exception("Sensor offline")), \
          patch.dict(os.environ, {"TERMUX_VERSION": "0.118.0"}):
         gov = PowerGovernor()
         gov._is_termux = True
         dec = gov.check()
-        assert dec.allowed is True
-        assert "operating in fail-open mode" in dec.reason
-        
-        # Verify POWER_SENSOR_OUTAGE logged in SESSION.evidence_ledger
+        assert dec.allowed is True and dec.battery_pct is None and dec.temp_c is None
+        assert "unreadable" in dec.reason
+        assert gov.check(unattended=True).allowed is False
+
         events = [e for e in SESSION.evidence_ledger if e["event_type"] == "POWER_SENSOR_OUTAGE"]
         assert len(events) == 1
-        assert events[0]["details"]["mode"] == "FAIL_OPEN"
-        assert "offline" in events[0]["details"]["reason"]
+        assert events[0]["details"]["mode"] == "FAIL_CLOSED_UNATTENDED"
+        assert "unreadable" in events[0]["details"]["reason"]
 
 
 def test_runpy_runtime_warning_eliminated():

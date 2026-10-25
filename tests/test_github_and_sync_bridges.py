@@ -8,6 +8,7 @@ Verifies:
   - Bluetooth PAN and Wireless ADB sync runbook formatting
 """
 
+import platform
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -68,9 +69,10 @@ class TestDualNodeSyncBridge(unittest.TestCase):
         self.assertIn("node_id", sub)
         self.assertIn("machine", sub)
         self.assertIn("is_arm64", sub)
-        # In this aarch64 PRoot environment:
-        self.assertTrue(sub["is_arm64"])
-        self.assertIn("Node Alpha", sub["node_id"])
+        # The label must agree with the machine the test runs on (phone or workstation)
+        is_arm64 = platform.machine().lower() in ("aarch64", "arm64")
+        self.assertEqual(sub["is_arm64"], is_arm64)
+        self.assertIn("Node Alpha" if is_arm64 else "Node Beta", sub["node_id"])
 
     def test_ssh_listener_probe(self):
         """Verify non-privileged port probe runs without raising exceptions."""
