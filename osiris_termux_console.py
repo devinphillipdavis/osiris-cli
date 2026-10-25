@@ -76,7 +76,11 @@ def _load_dotenv():
 
 _load_dotenv()
 
-OLLAMA_GEN_URL = (os.environ.get("OLLAMA_HOST", "").strip() or "http://localhost:11434").rstrip("/") + "/api/generate"
+try:
+    from osiris_cli.providers.ollama_compat import ollama_base_url
+    OLLAMA_GEN_URL = ollama_base_url() + "/api/generate"
+except ImportError:
+    OLLAMA_GEN_URL = "http://localhost:11434/api/generate"
 CHAT_MODEL = os.environ.get("OSIRIS_CHAT_MODEL", "gemma-3-1b")
 CODE_MODEL = os.environ.get("OSIRIS_CODE_MODEL", "gemma-3-1b")
 
