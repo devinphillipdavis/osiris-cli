@@ -63,6 +63,8 @@ LAYERS = (
         ("draft proposer: spec → candidate code (unpromoted assistant)", "osiris_termux_console._synthesize"),
         ("mentor voice, warmed at start-up, fast voice for long messages", "living.OllamaMentor"),
         ("experiment brief, simulator first", "/experiment"),
+        ("tool loop: confined reads, writes proposed for /apply, commands approved one by one",
+         "osiris_cli/code_agent.py · /code"),
     ), ("baseline, alternative and conservative candidates side by side",)),
     Layer("L5", "Verify", (
         ("sandboxed test run after a static AST check", "osiris_termux_console._run_sandboxed_test · /why"),

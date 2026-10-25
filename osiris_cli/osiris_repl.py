@@ -1356,6 +1356,7 @@ def display_help() -> None:
     print("    /check [trainer|git|ledger|system|evidence] [path|m3c]   Run OSIRIS's read-only checks")
     print("    /legit <text|ID|list> Is a claim legit? Verdicts from the claims register, with evidence")
     print("    /gemini [--dry] <q>  Ask Gemini directly (advisory; redacted, budgeted, ledgered)")
+    print("    /code [--model M] <task>  Local model with tools: reads, proposed writes (/apply), approved commands")
     print("    /physics <check> k=v  Physics bounds: thrust, rim, metric, chsh, efficiency, entropy, dd")
     print("    /retrieval [status|load-scifact|build-index|run|evaluate|capsule|verify|query|unload]")
     print("                         olmo3-embed-7b evidence retrieval over SciFact (ranks evidence; no verdicts)")
@@ -1684,6 +1685,9 @@ def dispatch_command(state: OsirisReplState, line: str) -> None:
     elif cmd == "/forget":
         needle = line_clean[len(parts[0]):].strip()
         print("[OSIRIS] " + (get_living().forget(needle) if needle else "use /forget <words in the fact>"))
+    elif cmd == "/code":
+        from osiris_cli import code_agent
+        code_agent.run_code_command(state, line_clean[len(parts[0]):].strip())
     elif cmd == "/gemini":
         from osiris_cli import gemini_gateway
         print("\n" + gemini_gateway.run_command(line_clean[len(parts[0]):].strip()) + "\n")

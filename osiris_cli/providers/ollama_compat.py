@@ -156,6 +156,52 @@ class OllamaCompatibilityProvider(BaseModelProvider):
                 total_duration_ms=(time.monotonic() - t0) * 1000.0,
             )
 
+    def chat(self, request: ProviderRequest) -> ProviderResponse:
+        """Multi-turn /api/chat. ``request.tools`` are offered to the model and any native
+        tool calls come back in ``ProviderResponse.tool_calls``. A message's metadata may
+        carry ``tool_calls`` (assistant turns) or ``name`` (tool results). Never raises."""
+        t0 = time.monotonic()
+        model = request.model or self.selected_model
+        messages = []
+        if request.system:
+            messages.append({"role": "system", "content": request.system})
+        for m in request.messages:
+            entry = {"role": m.role, "content": m.content}
+            entry.update({k: v for k, v in (m.metadata or {}).items() if k in ("tool_calls", "name")})
+            messages.append(entry)
+        payload = {
+            "model": model,
+            "messages": messages,
+            "stream": False,
+            "options": {"num_predict": request.max_tokens, "temperature": request.temperature},
+        }
+        if request.tools:
+            payload["tools"] = request.tools
+
+        req = urllib.request.Request(f"{self.host}/api/chat", data=json.dumps(payload).encode(),
+                                     headers={"Content-Type": "application/json"}, method="POST")
+        try:
+            with urllib.request.urlopen(req, timeout=request.timeout) as resp:
+                data = json.loads(resp.read().decode())
+        except Exception as e:  # noqa: BLE001 - errors are returned, never raised
+            return ProviderResponse(
+                content="", model=model, provider="ollama_compat", request_id=request.request_id,
+                finish_reason=FinishReason.ERROR, error=f"Ollama chat failed: {e}",
+                total_duration_ms=(time.monotonic() - t0) * 1000.0,
+            )
+        message = data.get("message") or {}
+        return ProviderResponse(
+            content=message.get("content", "") or "",
+            model=model,
+            provider="ollama_compat",
+            request_id=request.request_id,
+            finish_reason=FinishReason.STOP if data.get("done") else FinishReason.LENGTH,
+            eval_count=data.get("eval_count", 0),
+            prompt_eval_count=data.get("prompt_eval_count", 0),
+            total_duration_ms=(time.monotonic() - t0) * 1000.0,
+            tool_calls=message.get("tool_calls") or None,
+        )
+
     def stream(self, request: ProviderRequest) -> Iterator[ProviderStreamChunk]:
         resp = self.generate(request)
         yield ProviderStreamChunk(
