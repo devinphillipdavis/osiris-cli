@@ -46,11 +46,14 @@ def check_environment():
     print("\n" + "="*70)
 
 def cmd_chat(args):
-    """Launch chat-native TUI"""
-    print("\n⚛ Launching OSIRIS Chat Interface...\n")
-
-    from osiris_tui_core import run_textual_mode
-    run_textual_mode()
+    """The OSIRIS REPL (the `osiris` command); --tui keeps the Textual interface."""
+    if getattr(args, 'tui', False):
+        print("\n⚛ Launching OSIRIS Chat Interface (Textual TUI)...\n")
+        from osiris_tui_core import run_textual_mode
+        run_textual_mode()
+        return
+    from osiris_cli.osiris_repl import main as repl_main
+    repl_main([])
 
 def cmd_benchmark(args):
     """Run quantum hardware benchmarking"""
@@ -1484,7 +1487,8 @@ def main():
     subparsers = parser.add_subparsers(dest='command', help='Command to run')
 
     # Chat command
-    subparsers.add_parser('chat', help='Launch chat interface')
+    chat_parser = subparsers.add_parser('chat', help='The OSIRIS REPL (same as `osiris`)')
+    chat_parser.add_argument('--tui', action='store_true', help='Use the Textual TUI instead')
 
     # Benchmark command
     bench_parser = subparsers.add_parser('benchmark', help='Run benchmarking')

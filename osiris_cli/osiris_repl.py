@@ -113,70 +113,166 @@ BANNER = r"""
 # HYSTERETIC POWER GOVERNOR (PORTED FROM OSIRIS-MOBILE-TERMUX / EDGE HARNESS)
 # ═══════════════════════════════════════════════════════════════════════════════
 
+TERMUX_BIN = "/data/data/com.termux/files/usr/bin"
+
+
+def _fmt_reading(value: Optional[float], unit: str) -> str:
+    return "unknown" if value is None else f"{value:.1f}{unit}"
+
+
 class PowerDecision:
-    """Represents a power governor evaluation result."""
-    def __init__(self, allowed: bool, reason: str, battery_pct: float, temp_c: float, is_desktop: bool = False):
+    """A power governor evaluation. ``battery_pct``/``temp_c`` are None when nothing was
+    measured -- a node without a battery sensor, or a sensor that did not answer."""
+    def __init__(self, allowed: bool, reason: str, battery_pct: Optional[float] = None,
+                 temp_c: Optional[float] = None, is_desktop: bool = False, measured: bool = False):
         self.allowed = allowed
         self.reason = reason
         self.battery_pct = battery_pct
         self.temp_c = temp_c
         self.is_desktop = is_desktop
+        self.measured = measured
+
+    def readings(self) -> str:
+        return f"Bat: {_fmt_reading(self.battery_pct, '%')}, Temp: {_fmt_reading(self.temp_c, '°C')}"
+
+    def summary(self) -> str:
+        """The reason, plus the readings when anything was measured."""
+        return f"{self.reason} ({self.readings()})" if self.measured else self.reason
 
     def __repr__(self) -> str:
         tag = "ALLOW" if self.allowed else "BLOCKED"
         mode = "MAINS/DESKTOP" if self.is_desktop else "BATTERY/EDGE"
-        return f"<PowerDecision [{tag}] {mode}: {self.reason} (Bat: {self.battery_pct:.1f}%, Temp: {self.temp_c:.1f}°C)>"
+        return f"<PowerDecision [{tag}] {mode}: {self.reason} ({self.readings()})>"
 
 
 class PowerGovernor:
     """
     Hysteretic power governor for mobile, edge, and desktop execution.
-    - On Android/Termux: Monitors battery level and thermal sensors via termux-api.
-    - On Desktop/WSL/Servers: Fails open as UNRESTRICTED MAINS POWER.
+    - On Android/Termux (including PRoot under Termux): reads termux-battery-status.
+    - Elsewhere: no battery sensor; work is allowed and the readings are reported as unknown.
+    - Sensor unreadable on Termux: attended work is allowed; unattended work is refused
+      (``check(unattended=True)``), since nothing would stop it at a thermal or battery limit.
     """
+    SENSOR_TIMEOUT_S = 6.0      # termux-api answers in ~2.2 s on the Fold under PRoot
+    CACHE_TTL_S = 30.0
+
     def __init__(self, min_battery: float = 15.0, throttle_temp: float = 42.0, abort_temp: float = 46.0):
         self.min_battery = min_battery
         self.throttle_temp = throttle_temp
         self.abort_temp = abort_temp
         self._is_termux = "TERMUX_VERSION" in os.environ or os.path.exists("/data/data/com.termux")
         self._outage_logged = False
+        self._cached: Optional[Tuple[float, Optional[Dict[str, Any]]]] = None
 
-    def check(self) -> PowerDecision:
-        if not self._is_termux:
-            # Desktop WSL / Linux - Fail-open unrestricted
-            return PowerDecision(
-                allowed=True,
-                reason="Unrestricted desktop mains power active",
-                battery_pct=100.0,
-                temp_c=36.0,
-                is_desktop=True
-            )
+    def _sensor_binary(self) -> Optional[str]:
+        found = shutil.which("termux-battery-status")
+        if found:
+            return found
+        fallback = os.path.join(TERMUX_BIN, "termux-battery-status")
+        return fallback if os.access(fallback, os.X_OK) else None
 
-        # Attempt Termux API read
-        try:
-            res = subprocess.run(["termux-battery-status"], capture_output=True, text=True, timeout=1.5)
-            if res.returncode == 0:
-                data = json.loads(res.stdout)
-                pct = float(data.get("percentage", 100))
-                temp = float(data.get("temperature", 30.0))
-                plugged = data.get("plugged", "UNPLUGGED") != "UNPLUGGED"
-
-                if temp >= self.abort_temp:
-                    return PowerDecision(False, f"Thermal abort: {temp:.1f}°C >= {self.abort_temp}°C", pct, temp)
-                if pct < self.min_battery and not plugged:
-                    return PowerDecision(False, f"Battery critical: {pct:.1f}% < {self.min_battery}%", pct, temp)
-                return PowerDecision(True, "Termux power envelope optimal", pct, temp)
-        except Exception:
-            pass
-
-        # Fallback fail-open mode (sensor offline)
-        if not getattr(self, "_outage_logged", False):
+    def _read_sensor(self) -> Optional[Dict[str, Any]]:
+        now = time.monotonic()
+        if self._cached and now - self._cached[0] < self.CACHE_TTL_S:
+            return self._cached[1]
+        data = None
+        binary = self._sensor_binary()
+        if binary:
             try:
-                SESSION.log_event("POWER_SENSOR_OUTAGE", {"reason": "termux-battery-status offline", "mode": "FAIL_OPEN"})
+                res = subprocess.run([binary], capture_output=True, text=True, timeout=self.SENSOR_TIMEOUT_S)
+                if res.returncode == 0:
+                    parsed = json.loads(res.stdout)
+                    data = parsed if isinstance(parsed, dict) else None
+            except Exception:
+                data = None
+        self._cached = (now, data)
+        return data
+
+    def check(self, unattended: bool = False) -> PowerDecision:
+        if not self._is_termux:
+            return PowerDecision(True, "No battery sensor on this node (mains power assumed)", is_desktop=True)
+
+        data = self._read_sensor()
+        if data is not None:
+            pct = _optional_float(data.get("percentage"))
+            temp = _optional_float(data.get("temperature"))
+            plugged = data.get("plugged", "UNPLUGGED") != "UNPLUGGED"
+            if temp is not None and temp >= self.abort_temp:
+                return PowerDecision(False, f"Thermal abort: {temp:.1f}°C >= {self.abort_temp}°C", pct, temp, measured=True)
+            if pct is not None and pct < self.min_battery and not plugged:
+                return PowerDecision(False, f"Battery critical: {pct:.1f}% < {self.min_battery}%", pct, temp, measured=True)
+            if unattended and (pct is None or temp is None):
+                return PowerDecision(False, "Power sensor reading incomplete; unattended work refused (fail-closed)",
+                                     pct, temp, measured=True)
+            return PowerDecision(True, "Termux power envelope within limits", pct, temp, measured=True)
+
+        if not self._outage_logged:
+            try:
+                SESSION.log_event("POWER_SENSOR_OUTAGE", {"reason": "termux-battery-status unreadable",
+                                                          "mode": "FAIL_CLOSED_UNATTENDED"})
             except Exception:
                 pass
             self._outage_logged = True
-        return PowerDecision(True, "Termux sensor offline, operating in fail-open mode", 85.0, 35.0)
+        if unattended:
+            return PowerDecision(False, "Power sensor unreadable; unattended work refused (fail-closed)")
+        return PowerDecision(True, "Power sensor unreadable; attended work only (unattended work refused)")
+
+
+def _optional_float(value: Any) -> Optional[float]:
+    try:
+        out = float(value)
+    except (TypeError, ValueError):
+        return None
+    return out if math.isfinite(out) else None
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# SUBSTRATE + CLAIMS LABELS (computed from what was detected, never typed in)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+NODE_NAMES = {
+    "NODE_ALPHA_MOBILE": "Node Alpha (mobile edge)",
+    "NODE_BETA_COMPUTE": "Node Beta (compute workstation)",
+    "NODE_GENERIC_EDGE": "Unclassified node",
+}
+
+
+def substrate_simd(hp: Any) -> str:
+    feats = [name for name, on in (("NEON", hp.has_neon), ("AVX2", hp.has_avx2),
+                                   ("AVX-VNNI", hp.has_avx_vnni)) if on]
+    return " / ".join(feats) if feats else "none detected"
+
+
+def substrate_label(hp: Any) -> str:
+    """The detected node: classification, architecture, environment and SIMD."""
+    if hp is None:
+        return "undetected (hardware mesh unavailable)"
+    name = NODE_NAMES.get(hp.node_type.value, hp.node_type.value)
+    if hp.is_termux:
+        env = "Termux"
+    elif hp.is_android:
+        env = "Android"
+    elif "microsoft" in platform.release().lower():
+        env = "WSL"
+    else:
+        env = platform.system() or "unknown OS"
+    return f"{name} | {hp.machine_arch} | {env} | SIMD: {substrate_simd(hp)}"
+
+
+def claims_summary(shown: int = 4) -> str:
+    """Register size and the ``shown`` most common verdict counts (``/legit list`` has all)."""
+    try:
+        from osiris_cli import claims as _claims
+    except Exception as e:
+        return f"register unavailable ({e})"
+    counts: Dict[str, int] = {}
+    for c in _claims.REGISTER:
+        counts[c.verdict] = counts.get(c.verdict, 0) + 1
+    ranked = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))
+    parts = " · ".join(f"{n} {v}" for v, n in ranked[:shown])
+    if len(ranked) > shown:
+        parts += f" · +{len(ranked) - shown} more verdicts"
+    return f"{len(_claims.REGISTER)} registered claims | {parts}"
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -450,6 +546,11 @@ class OsirisReplState:
 
 
 SESSION = OsirisReplState()
+if otc is not None:
+    def _unattended_power_gate() -> Tuple[bool, str]:
+        dec = SESSION.power_gov.check(unattended=True)
+        return dec.allowed, dec.reason
+    otc.UNATTENDED_POWER_GATE = _unattended_power_gate
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -474,10 +575,7 @@ def print_banner():
     # Dynamic Hardware Mesh Substrate Evaluation
     hp = getattr(SESSION, "hardware_profile", None)
     if hp:
-        is_alpha = hp.is_termux or hp.machine_arch in ("aarch64", "arm64")
-        node_name = "Node Alpha: Mobile Edge (Fold7 / Termux)" if is_alpha else "Node Beta: Compute Workstation (PC / Intel Core Ultra / WSL)"
-        simd_feat = "NEON SIMD Vector" if hp.has_neon else ("AVX2 / AVX-VNNI" if (hp.has_avx2 or hp.has_avx_vnni) else "Standard Vector")
-        print(f"\033[92m  [SUBSTRATE MESH] {node_name} | Arch: {hp.machine_arch} | SIMD: {simd_feat}\033[0m")
+        print(f"\033[92m  [SUBSTRATE MESH] {substrate_label(hp)}\033[0m")
         print(f"\033[90m  [RESOURCE LIMITS] Horizon: {hp.execution_timeout_s:.0f}s (Extended={hp.allow_extended_horizons}) | Coherence Floor: {hp.coherence_floor}\033[0m\n")
     
     if otc is not None and osiris_ui is not None:
@@ -500,7 +598,7 @@ def print_banner():
 def execute_ignite(state: Optional[OsirisReplState] = None, dry_run: bool = False) -> Dict[str, Any]:
     """
     Executes the Sovereign Substrate Verification & Metamorphosis Trigger:
-      1. Verifies Node Alpha edge hardware, AST firewall, and power envelope.
+      1. Reports the detected node, AST firewall, and power envelope.
       2. Validates mentor engine and evaluates NCLM speaking gate (SYS-026).
       3. Triggers genome metamorphosis, promoting eligible capability gaps into sprint backlog.
     """
@@ -511,13 +609,15 @@ def execute_ignite(state: Optional[OsirisReplState] = None, dry_run: bool = Fals
 
     print("\n\033[1;36m[IGNITION] Initiating Sovereign Substrate & Metamorphosis Trigger...\033[0m")
     
-    # 1. Physical Edge Substrate Verification
-    print("  \033[1;37m── Physical Substrate: Node Alpha Mobile Edge (ARM64 / Termux) ──\033[0m")
-    print("  ├─ Vector Hardware:  ARMv8-A NEON SIMD Vector Acceleration Verified")
+    # 1. Detected substrate
+    hp = getattr(state, "hardware_profile", None)
+    print(f"  \033[1;37m── Physical Substrate: {substrate_label(hp)} ──\033[0m")
+    print(f"  ├─ Vector Hardware:  {substrate_simd(hp) if hp else 'undetected'} (detected CPU flags)")
     print("  ├─ AST Firewall:     CIL L0-L6 Interposition Active [SYS-025 ENFORCED FAIL-CLOSED]")
-    print(f"  ├─ Power Governor:   {p_dec.reason} (Bat: {p_dec.battery_pct:.1f}%, Temp: {p_dec.temp_c:.1f}°C)")
-    print(f"  ├─ Coherence Floor:  Γ_floor = {state.coherence_floor:.4f} [ENFORCED FAIL-CLOSED]")
-    print("  └─ Substrate Status: \033[1;32mEDGE SUBSTRATE OPERATIONAL\033[0m")
+    print(f"  ├─ Power Governor:   {p_dec.summary()}")
+    print(f"  ├─ Coherence Floor:  Γ_floor = {state.coherence_floor:.4f} (configured threshold, not a measured invariant)")
+    detected = "\033[1;32mDETECTED\033[0m" if hp else "\033[1;33mUNDETECTED\033[0m"
+    print(f"  └─ Substrate Status: {detected}")
 
     # 2. Cognitive Substrate & Speaking Gate
     print("  \033[1;37m── Cognitive Substrate: Mentor Engine & NCLM-1 Speaking Gate ──\033[0m")
@@ -532,7 +632,7 @@ def execute_ignite(state: Optional[OsirisReplState] = None, dry_run: bool = Fals
         mentor_model = "offline"
         gate_note = f"offline ({e})"
         gate_open = False
-    print(f"  ├─ Mentor Substrate: {mentor_model} (Gemma-native neutral provider)")
+    print(f"  ├─ Mentor Substrate: {mentor_model}")
     print(f"  ├─ NCLM-1 Voice:     {gate_note} [SYS-026]")
     mesh_status = "\033[1;33mSTANDBY (mentor offline)\033[0m" if mentor_model in ("offline", "none reachable") else "\033[1;32mDELIBERATIVE MESH READY\033[0m"
     print(f"  └─ Cognitive Mesh:   {mesh_status}\n")
@@ -1171,9 +1271,9 @@ def execute_power_status(state: Optional[OsirisReplState] = None) -> None:
     clearance = "\033[1;32mALLOWED\033[0m" if dec.allowed else "\033[1;31mTHROTTLED\033[0m"
     print(f"  Clearance:   {clearance}")
     print(f"  Reason:      {dec.reason}")
-    print(f"  Battery:     {dec.battery_pct:.1f}%")
-    print(f"  Temperature: {dec.temp_c:.1f}°C")
-    print(f"  Platform:    {'Desktop Mains (WSL/Linux)' if dec.is_desktop else 'Android / Termux Edge'}\n")
+    print(f"  Battery:     {_fmt_reading(dec.battery_pct, '%')}")
+    print(f"  Temperature: {_fmt_reading(dec.temp_c, '°C')}")
+    print(f"  Platform:    {'No battery sensor (mains assumed)' if dec.is_desktop else 'Android / Termux edge'}\n")
 
 
 def execute_firewall_status(state: Optional[OsirisReplState] = None) -> None:
@@ -1286,10 +1386,20 @@ def display_status(state: Optional[OsirisReplState] = None) -> None:
     print("\n\033[1;36m[OSIRIS::STATUS DASHBOARD]\033[0m")
     print(f"  Python Runtime : {sys.version.split()[0]} ({sys.platform})")
     print(f"  Process PID    : {os.getpid()}")
-    print(f"  Substrate Node : Node Alpha (Mobile Edge - Fold7 / Termux | aarch64 | NEON SIMD)")
+    print(f"  Substrate Node : {substrate_label(getattr(state, 'hardware_profile', None))}")
     print(f"  AST Firewall   : \033[1;32mACTIVE (SYS-025 L0-L6 Interposition · fail-closed ast.parse)\033[0m")
-    print(f"  Power Governor : {p_dec.reason} (Bat: {p_dec.battery_pct:.1f}%, Temp: {p_dec.temp_c:.1f}°C)")
-    print(f"  Coherence Floor: {state.coherence_floor:.4f} (Fail-closed ceiling Γ <= 0.092)")
+    print(f"  Power Governor : {p_dec.summary()}")
+    print(f"  Coherence Floor: {state.coherence_floor:.4f} (configured threshold, not a measured invariant)")
+    try:
+        from osiris_cli import claims as _claims
+
+        def _verdict(cid: str) -> str:
+            c = _claims.by_id(cid)
+            return c.verdict if c else "unregistered"
+        print(f"  CRSM constants : historical, not established -- θ_lock {THETA_LOCK_DEG}° {_verdict('THETA_LOCK')}, "
+              f"Λ_Φ {LAMBDA_PHI:.6e} {_verdict('LAMBDA_PHI')}, F_max {F_MAX_PREDICTED:.5f} {_verdict('F_MAX')} (/legit list)")
+    except Exception:
+        pass
 
     try:
         import genome
@@ -1315,9 +1425,9 @@ def display_status(state: Optional[OsirisReplState] = None) -> None:
     except Exception as e:
         mentor = "offline"
         gate_str = f"unavailable ({e})"
-    print(f"  Mentor Engine  : {mentor} (Gemma-native substrate)")
+    print(f"  Mentor Engine  : {mentor}")
     print(f"  NCLM-1 Voice   : {gate_str} (SYS-026)")
-    print(f"  Claims Firewall: 40 registered claims | 5 REFUTED · 3 ARTIFACT · 1 NOT_MEASURED (SYS-024 Enforced)")
+    print(f"  Claims Firewall: {claims_summary()} (SYS-024 Enforced)")
     print(f"  Uptime         : {uptime:.1f} s")
     print(f"  Evidence Events: {len(state.evidence_ledger)} items in Merkle ledger")
     if state.last_benchmark:
@@ -1356,6 +1466,7 @@ def display_help() -> None:
     print("    /check [trainer|git|ledger|system|evidence] [path|m3c]   Run OSIRIS's read-only checks")
     print("    /legit <text|ID|list> Is a claim legit? Verdicts from the claims register, with evidence")
     print("    /gemini [--dry] <q>  Ask Gemini directly (advisory; redacted, budgeted, ledgered)")
+    print("    /code [--model M] <task>  Local model with tools: reads, proposed writes (/apply), approved commands")
     print("    /physics <check> k=v  Physics bounds: thrust, rim, metric, chsh, efficiency, entropy, dd")
     print("    /retrieval [status|load-scifact|build-index|run|evaluate|capsule|verify|query|unload]")
     print("                         olmo3-embed-7b evidence retrieval over SciFact (ranks evidence; no verdicts)")
@@ -1438,6 +1549,31 @@ CONSOLE_COMMANDS = {
     "/plan", "/consensus", "/check", "/nclm", "/intent", "/ask", "/cancel", "/engage", "/tap",
     "/map", "/trial", "/evolve", "/capabilities", "/discover", "/outcome",
 }
+
+
+def dispatch_capturing(state: OsirisReplState, line: str) -> None:
+    """safe_dispatch with keys typed during the command's output captured, not echoed into it
+    (2026-10-25: '/architecture' typed while /check printed was scattered into the bench table,
+    looked lost, was retyped, and the terminal delivered '/architecture/architecture'). Finished
+    lines become held messages, shown and sent next; an unfinished one is shown, not sent.
+    Questions a command asks mid-way read through PausingStdin and behave as before."""
+    tty = getattr(sys.stdin, "isatty", lambda: False)() and getattr(sys.stdout, "isatty", lambda: False)()
+    if not tty:
+        safe_dispatch(state, line)
+        return
+    from osiris_cli.living import PausingStdin, TypeAhead
+    real = sys.stdin
+    with TypeAhead(True) as typed:
+        sys.stdin = PausingStdin(real)
+        try:
+            safe_dispatch(state, line)
+        finally:
+            sys.stdin = real
+    if typed.text:
+        try:
+            get_living()._hold(typed.text)
+        except Exception:  # noqa: BLE001 - never lose what was typed, even without a living OSIRIS
+            print(f"  · you typed {typed.text.strip()!r} while that ran -- not sent; retype it to send")
 
 
 def safe_dispatch(state: OsirisReplState, line: str) -> None:
@@ -1659,6 +1795,9 @@ def dispatch_command(state: OsirisReplState, line: str) -> None:
     elif cmd == "/forget":
         needle = line_clean[len(parts[0]):].strip()
         print("[OSIRIS] " + (get_living().forget(needle) if needle else "use /forget <words in the fact>"))
+    elif cmd == "/code":
+        from osiris_cli import code_agent
+        code_agent.run_code_command(state, line_clean[len(parts[0]):].strip())
     elif cmd == "/gemini":
         from osiris_cli import gemini_gateway
         print("\n" + gemini_gateway.run_command(line_clean[len(parts[0]):].strip()) + "\n")
@@ -1768,7 +1907,7 @@ def boot_repl() -> None:
             print("[OSIRIS] Session closed.")
             break
 
-        safe_dispatch(SESSION, line)
+        dispatch_capturing(SESSION, line)
 
     if _LIVING is not None:
         _LIVING.finish()
