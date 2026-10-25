@@ -84,23 +84,23 @@ class GovernanceController:
 
     @staticmethod
     def verify_target_scope(target_file: str, allowed_paths: Optional[List[str]] = None) -> Tuple[bool, str]:
-        """Check target file is not an immutable governance file and resides in allowed scope."""
-        basename = os.path.basename(target_file).lower()
-        if basename in IMMUTABLE_GOVERNANCE_FILES:
-            return False, f"Target '{target_file}' is an immutable governance artifact (SYS-025 violation)"
+        """Check target file is not an immutable governance file and resides in allowed scope.
 
-        if allowed_paths:
-            norm_target = os.path.abspath(target_file)
-            matched = False
-            for p in allowed_paths:
-                norm_p = os.path.abspath(p)
-                if norm_target == norm_p or norm_target.startswith(norm_p + os.sep):
-                    matched = True
-                    break
-            if not matched:
-                return False, f"Target '{target_file}' outside permitted scope {allowed_paths}"
+        Paths are compared after resolving symlinks, so a link inside the scope cannot point a
+        write outside it or at a governance file. With no scope given, the scope is the working
+        directory -- the same safe root the REPL's own write check uses -- never "anywhere".
+        """
+        resolved = os.path.realpath(target_file)
+        for name in {os.path.basename(target_file).lower(), os.path.basename(resolved).lower()}:
+            if name in IMMUTABLE_GOVERNANCE_FILES:
+                return False, f"Target '{target_file}' is an immutable governance artifact (SYS-025 violation)"
 
-        return True, "Scope valid"
+        roots = list(allowed_paths) if allowed_paths else ["."]
+        for p in roots:
+            root = os.path.realpath(p)
+            if resolved == root or resolved.startswith(root.rstrip(os.sep) + os.sep):
+                return True, "Scope valid"
+        return False, f"Target '{target_file}' outside permitted scope {roots}"
 
     @staticmethod
     def authorize_execution(
