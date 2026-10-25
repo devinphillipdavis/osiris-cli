@@ -1440,6 +1440,31 @@ CONSOLE_COMMANDS = {
 }
 
 
+def dispatch_capturing(state: OsirisReplState, line: str) -> None:
+    """safe_dispatch with keys typed during the command's output captured, not echoed into it
+    (2026-10-25: '/architecture' typed while /check printed was scattered into the bench table,
+    looked lost, was retyped, and the terminal delivered '/architecture/architecture'). Finished
+    lines become held messages, shown and sent next; an unfinished one is shown, not sent.
+    Questions a command asks mid-way read through PausingStdin and behave as before."""
+    tty = getattr(sys.stdin, "isatty", lambda: False)() and getattr(sys.stdout, "isatty", lambda: False)()
+    if not tty:
+        safe_dispatch(state, line)
+        return
+    from osiris_cli.living import PausingStdin, TypeAhead
+    real = sys.stdin
+    with TypeAhead(True) as typed:
+        sys.stdin = PausingStdin(real)
+        try:
+            safe_dispatch(state, line)
+        finally:
+            sys.stdin = real
+    if typed.text:
+        try:
+            get_living()._hold(typed.text)
+        except Exception:  # noqa: BLE001 - never lose what was typed, even without a living OSIRIS
+            print(f"  · you typed {typed.text.strip()!r} while that ran -- not sent; retype it to send")
+
+
 def safe_dispatch(state: OsirisReplState, line: str) -> None:
     """Run one command; if it raises, say which command failed, keep the traceback in
     ~/.osiris/logs/repl_errors.log and return to the prompt instead of ending the session."""
@@ -1768,7 +1793,7 @@ def boot_repl() -> None:
             print("[OSIRIS] Session closed.")
             break
 
-        safe_dispatch(SESSION, line)
+        dispatch_capturing(SESSION, line)
 
     if _LIVING is not None:
         _LIVING.finish()

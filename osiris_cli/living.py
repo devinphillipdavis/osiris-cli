@@ -578,14 +578,32 @@ def _last_hash(f, block: int = 65536) -> Optional[str]:
     return None
 
 
+#: Captures currently in force, outermost first. Nested captures (a model reply inside a
+#: command) share the terminal, so pausing restores the OUTERMOST saved mode.
+_TYPEAHEAD_STACK: List["TypeAhead"] = []
+
+
+def _read_pending(fd: int) -> bytes:
+    import select
+    try:
+        return drain_input(lambda: os.read(fd, 4096), lambda t: bool(select.select([fd], [], [], t)[0]))
+    except OSError:
+        return b""
+
+
 class TypeAhead:
-    """While a reply streams, keys typed are captured instead of echoed into the
-    reply (2026-09-29: questions typed during a slow reply appeared after
-    'OSIRIS ›' and each answer looked one turn late). Ctrl-C still works.
+    """While a reply streams or a command prints, keys typed are captured instead of
+    echoed into the output (2026-09-29: questions typed during a slow reply appeared
+    after 'OSIRIS ›' and each answer looked one turn late; 2026-10-25: '/architecture'
+    typed during /check output was echoed into the bench table, looked lost, was
+    retyped, and arrived as '/architecture/architecture'). Ctrl-C still works.
+    Code that asks the user something mid-command reads through `paused()` (or
+    `PausingStdin`), which gives back normal, echoed line input for that read.
     Not a terminal: does nothing."""
 
     def __init__(self, active: bool):
         self.active, self.text, self._saved = active, "", None
+        self._raw = b""
 
     def __enter__(self):
         if self.active:
@@ -598,23 +616,81 @@ class TypeAhead:
                 termios.tcsetattr(fd, termios.TCSANOW, new)
             except (ImportError, OSError, ValueError, AttributeError):
                 self._saved = None
+        if self._saved is not None:
+            _TYPEAHEAD_STACK.append(self)
         return self
 
     def __exit__(self, *exc):
         if self._saved is None:
             return False
-        import select
         import termios
         fd = sys.stdin.fileno()
-        data = b""
         try:
-            data = drain_input(lambda: os.read(fd, 4096), lambda t: bool(select.select([fd], [], [], t)[0]))
-        except OSError:
-            pass
+            self._raw += _read_pending(fd)
         finally:
             termios.tcsetattr(fd, termios.TCSANOW, self._saved)
-        self.text = keys_typed(data.decode("utf-8", errors="replace"))
+            if self in _TYPEAHEAD_STACK:
+                _TYPEAHEAD_STACK.remove(self)
+        self.text = keys_typed(self._raw.decode("utf-8", errors="replace"))
         return False
+
+
+class paused:
+    """Normal echoed line input for one read inside a capture. Keys typed before the
+    question appeared stay with the capture (shown afterwards, never fed into the
+    answer); everything typed after it is the answer. Outside a capture: no-op."""
+
+    def __enter__(self):
+        self._outer = _TYPEAHEAD_STACK[0] if _TYPEAHEAD_STACK else None
+        if self._outer is None:
+            return self
+        import termios
+        fd = sys.stdin.fileno()
+        _TYPEAHEAD_STACK[-1]._raw += _read_pending(fd)
+        termios.tcsetattr(fd, termios.TCSANOW, self._outer._saved)
+        return self
+
+    def __exit__(self, *exc):
+        if self._outer is None or not _TYPEAHEAD_STACK:
+            return False
+        import termios
+        fd = sys.stdin.fileno()
+        new = list(self._outer._saved)
+        new[3] &= ~(termios.ECHO | termios.ICANON)
+        termios.tcsetattr(fd, termios.TCSANOW, new)
+        return False
+
+
+class PausingStdin:
+    """sys.stdin stand-in for the duration of a captured command: every read pauses
+    the capture, so forms and confirmations behave exactly as without it."""
+
+    def __init__(self, real):
+        self._real = real
+
+    def readline(self, *args):
+        with paused():
+            return self._real.readline(*args)
+
+    def read(self, *args):
+        with paused():
+            return self._real.read(*args)
+
+    def readlines(self, *args):
+        with paused():
+            return self._real.readlines(*args)
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        line = self.readline()
+        if not line:
+            raise StopIteration
+        return line
+
+    def __getattr__(self, name):
+        return getattr(self._real, name)
 
 
 def keys_typed(raw: str) -> str:

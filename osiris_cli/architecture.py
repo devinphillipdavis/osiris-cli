@@ -36,6 +36,8 @@ LAYERS = (
         ("governed intake: records every exchange; learns only from eligible material you explicitly approve",
          "osiris_cli/paste_learning.py · osiris_cli/living.py · osiris_cli/osiris_repl.py"),
         ("a paste is one message, however the terminal splits it", "bracketed paste · living.keys_typed"),
+        ("keys typed while a command prints are held, not echoed into its output",
+         "living.TypeAhead · osiris_repl.dispatch_capturing"),
         ("long pastes go to the model as a bounded excerpt", "living.Osiris.excerpt"),
         ("what changed since the last session", "session_state.py"),
     ), ("a run ID per task carrying its permissions and budget",)),
