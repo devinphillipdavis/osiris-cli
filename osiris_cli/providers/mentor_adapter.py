@@ -68,9 +68,9 @@ class ProviderMentorAdapter:
         """Resolve current active model."""
         if self._model:
             return self._model
-        env_model = os.environ.get("OSIRIS_VOICE") or os.environ.get("OSIRIS_CHAT_MODEL")
-        if env_model:
-            return env_model
+        env_voice = os.environ.get("OSIRIS_VOICE")
+        if env_voice:
+            return env_voice
         prov_model = getattr(self.provider, "selected_model", None)
         if prov_model:
             return prov_model
