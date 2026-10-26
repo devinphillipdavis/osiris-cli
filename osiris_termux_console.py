@@ -85,6 +85,7 @@ CHAT_MODEL = os.environ.get("OSIRIS_CHAT_MODEL", "gemma-3-1b")
 CODE_MODEL = os.environ.get("OSIRIS_CODE_MODEL", "gemma-3-1b")
 
 ARCHITECT_PREFERENCES = (
+    "gemma2:2b",
     "gemma-3-1b",
     "gemma-3-4b",
     "gemma-3-270m",
@@ -101,10 +102,12 @@ ARCHITECT_PREFERENCES = (
 )
 
 SYNTHESIZER_PREFERENCES = (
+    "gemma2:2b",
     "gemma-3-1b",
     "gemma-3-4b",
     "gemma-2-2b",
     "gemma3:1b",
+    "gemma:2b",
     "qwen2.5-coder:7b",
     "deepseek-coder",
     "qwen2.5:7b",
