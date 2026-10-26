@@ -1135,7 +1135,15 @@ def get_living():
                 return intent_router.classify(text)[0] == "conversation"
         except ImportError:
             pass
-        _LIVING = Osiris(core=core, knowledge=knowledge, probes=Probes(LIVING_HOME, trainer_status=trainer_status),
+        mentor = None
+        try:
+            from osiris_cli.providers.mentor_adapter import ProviderMentorAdapter
+            from osiris_cli.providers.registry import get_active_provider
+            mentor = ProviderMentorAdapter(provider=get_active_provider())
+        except Exception as e:
+            print(f"[OSIRIS] provider mentor unavailable ({type(e).__name__}); mentor voice defaults to Ollama.")
+
+        _LIVING = Osiris(core=core, mentor=mentor, knowledge=knowledge, probes=Probes(LIVING_HOME, trainer_status=trainer_status),
                          small_talk=small_talk)
     return _LIVING
 
@@ -1820,8 +1828,10 @@ def dispatch_command(state: OsirisReplState, line: str) -> None:
         print()
     elif cmd == "/mentor":
         living = get_living()
-        living.mentor.set_model(parts[1] if len(parts) > 1 else None)
-        print(f"[OSIRIS] mentor voice: {living.mentor.model() or 'none reachable'}")
+        target = parts[1] if len(parts) > 1 else None
+        living.mentor.set_model(target)
+        base_info = getattr(living.mentor, "base", "local")
+        print(f"[OSIRIS] mentor voice: {living.mentor.model() or 'none reachable'} ({base_info})")
     elif cmd in ("/bridges", "bridges"):
         execute_bridges()
     elif cmd in ("/validate", "validate"):

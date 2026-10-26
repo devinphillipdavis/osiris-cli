@@ -28,40 +28,60 @@ from .base import (
 class GeminiCompatibilityProvider(BaseModelProvider):
     """Wraps Google Gemini REST API conforming to BaseModelProvider."""
 
-    def __init__(self, model: str = "gemini-3.6-flash", timeout: float = 45.0):
+    def __init__(self, model: str = "gemini-2.5-flash", timeout: float = 45.0):
         self.selected_model = model
         self.timeout = timeout
         self.cancelled_requests: set[str] = set()
 
     def capabilities(self) -> ProviderCapabilities:
+        models = ["gemini-2.5-flash", "gemini-3.6-flash", "gemini-1.5-pro"]
+        try:
+            import gemini_bridge
+            active_m = gemini_bridge.model_name()
+            if active_m and active_m not in models:
+                models.insert(0, active_m)
+            elif active_m and models.index(active_m) > 0:
+                models.remove(active_m)
+                models.insert(0, active_m)
+        except Exception:
+            pass
         return ProviderCapabilities(
             provider_name="gemini_compat",
-            supports_streaming=False,
+            supports_streaming=True,
             supports_structured_output=True,
             supports_tool_calling=True,
             supports_token_count=True,
-            supported_models=["gemini-3.6-flash", "gemini-2.5-flash", "gemini-1.5-pro"],
+            supported_models=models,
             max_context_length=1048576,
             default_placement=ExecutionPlacement.CLOUD,
         )
 
     def health(self) -> ProviderHealth:
-        api_key = os.environ.get("GEMINI_API_KEY", "").strip()
-        if not api_key:
+        try:
+            import gemini_bridge
+            if not gemini_bridge.is_configured():
+                return ProviderHealth(
+                    status=HealthStatus.NOT_CONFIGURED,
+                    available=False,
+                    provider_name="gemini_compat",
+                    selected_model=self.selected_model,
+                    message="Gemini credentials not configured (API key or Vertex)",
+                )
             return ProviderHealth(
-                status=HealthStatus.NOT_CONFIGURED,
+                status=HealthStatus.HEALTHY,
+                available=True,
+                provider_name="gemini_compat",
+                selected_model=gemini_bridge.model_name() or self.selected_model,
+                message="Gemini gateway configured and operational",
+            )
+        except Exception as e:
+            return ProviderHealth(
+                status=HealthStatus.UNAVAILABLE,
                 available=False,
                 provider_name="gemini_compat",
                 selected_model=self.selected_model,
-                message="GEMINI_API_KEY environment variable is not set",
+                message=f"Gemini health check error: {e}",
             )
-        return ProviderHealth(
-            status=HealthStatus.HEALTHY,
-            available=True,
-            provider_name="gemini_compat",
-            selected_model=self.selected_model,
-            message="Gemini API key is configured",
-        )
 
     def cancel(self, request_id: str) -> bool:
         self.cancelled_requests.add(request_id)
@@ -131,10 +151,23 @@ class GeminiCompatibilityProvider(BaseModelProvider):
 
     def stream(self, request: ProviderRequest) -> Iterator[ProviderStreamChunk]:
         resp = self.generate(request)
-        yield ProviderStreamChunk(
-            text=resp.content,
-            is_final=True,
-            chunk_index=0,
-            request_id=request.request_id,
-            finish_reason=resp.finish_reason,
-        )
+        if not resp.is_success or not resp.content:
+            yield ProviderStreamChunk(
+                text="",
+                is_final=True,
+                chunk_index=0,
+                request_id=request.request_id,
+                finish_reason=resp.finish_reason,
+            )
+            return
+
+        lines = resp.content.splitlines(keepends=True)
+        for i, line in enumerate(lines):
+            is_last = (i == len(lines) - 1)
+            yield ProviderStreamChunk(
+                text=line,
+                is_final=is_last,
+                chunk_index=i,
+                request_id=request.request_id,
+                finish_reason=resp.finish_reason if is_last else None,
+            )

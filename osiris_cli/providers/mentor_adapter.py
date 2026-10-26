@@ -31,7 +31,7 @@ class ProviderMentorAdapter:
         self,
         provider: Optional[BaseModelProvider] = None,
         model: Optional[str] = None,
-        timeout: float = 60.0,
+        timeout: float = 120.0,
     ):
         self._provider = provider
         self._model = model
@@ -68,15 +68,41 @@ class ProviderMentorAdapter:
         """Resolve current active model."""
         if self._model:
             return self._model
-        env_model = os.environ.get("OSIRIS_CHAT_MODEL")
+        env_model = os.environ.get("OSIRIS_VOICE") or os.environ.get("OSIRIS_CHAT_MODEL")
         if env_model:
             return env_model
+        prov_model = getattr(self.provider, "selected_model", None)
+        if prov_model:
+            return prov_model
         models = self.installed()
         return models[0] if models else "gemma-3-1b"
 
     def set_model(self, name: Optional[str]) -> None:
-        """Set explicitly pinned mentor model."""
-        self._model = name
+        """Set explicitly pinned mentor model or switch provider."""
+        if not name:
+            self._model = None
+            return
+        target = name.strip()
+        lower = target.lower()
+        from .registry import create_provider
+        if lower in ("gemini", "gemini-compat") or lower.startswith("gemini-"):
+            self._provider = create_provider("gemini")
+            self._model = target if lower.startswith("gemini-") else self._provider.capabilities().supported_models[0]
+            return
+        if lower in ("gemma",) or lower.startswith("gemma-") or lower.startswith("gemma2:"):
+            if lower.startswith("gemma2:") or lower.startswith("gemma:"):
+                self._provider = create_provider("ollama", model=target)
+                self._model = target
+            else:
+                self._provider = create_provider("gemma", model=target)
+                self._model = target
+            return
+        if lower in ("ollama", "qwen", "qwen2.5:1.5b", "qwen2.5:3b", "qwen2.5:7b", "llama3.2:1b", "llama3.2:3b", "smollm2:360m"):
+            self._provider = create_provider("ollama")
+            if ":" in target:
+                self._model = target
+            return
+        self._model = target
 
     def fast_model(self) -> Optional[str]:
         """Return low-latency / small variant model if available."""
@@ -120,12 +146,14 @@ class ProviderMentorAdapter:
                 resp = self.provider.generate(req)
                 if resp.content:
                     yield resp.content
+            self.last_done = {"done_reason": "stop"}
         except Exception as e:
             logger.warning(f"Primary mentor streaming error ({type(e).__name__}: {e}), attempting fallback...")
             # If current provider fails, try fallback mock provider for fail-safe REPL continuity
             try:
                 fallback_provider = create_provider("gemma", mode="mock", model="gemma-3-1b")
                 resp = fallback_provider.generate(req)
+                self.last_done = {"done_reason": "stop"}
                 yield f"[gemma:mock fallback] {resp.content}"
             except Exception as e_fallback:
                 raise ConnectionError(f"Mentor substrate exhausted: {e} -> fallback error: {e_fallback}") from e
