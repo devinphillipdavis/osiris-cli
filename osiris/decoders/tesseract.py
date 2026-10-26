@@ -4,7 +4,7 @@ Tesseract Decoder Organism — A* / beam-search decoding in 4D lattice space.
 
 import heapq
 from typing import Any, Dict, List, Optional, Set, Tuple
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 
 @dataclass

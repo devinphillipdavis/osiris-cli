@@ -21,12 +21,12 @@ import json
 import logging
 import os
 import time
-from dataclasses import dataclass, field, asdict
-from typing import Dict, List, Optional, Any
+from dataclasses import dataclass, asdict
+from typing import Dict, List, Any
 
 import numpy as np
 
-from qbyte_system import GOLDEN_RATIO, CHI_PC, PHI_THRESHOLD
+from qbyte_system import GOLDEN_RATIO, CHI_PC
 
 logger = logging.getLogger("NCLM")
 

@@ -10,13 +10,11 @@ Framework: DNA::}{::lang v51.843
 
 import json
 import os
-import glob
 import math
 import hashlib
 from datetime import datetime
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import List, Dict, Optional, Tuple
-from collections import Counter
 
 # ── Constants (measured from 490K shots) ──
 PHI_GOLDEN = (1 + math.sqrt(5)) / 2

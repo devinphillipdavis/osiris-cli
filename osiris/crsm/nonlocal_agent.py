@@ -10,19 +10,16 @@ Framework: DNA::}{::lang v51.843
 
 import math
 import time
-import hashlib
 import logging
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Tuple
 
 from .swarm_orchestrator import (
-    CRSMLayer,
     CRSMState,
     THETA_LOCK_DEG,
     PHI_THRESHOLD,
     GAMMA_CRITICAL,
-    CCCE_THRESHOLD,
 )
 
 logger = logging.getLogger("nonlocal_agent")

@@ -8,7 +8,7 @@ AURA maintains organism boundaries and geometric coherence.
 Pole: South
 """
 
-from typing import Optional, Dict, Any, List
+from typing import Dict, Any, List
 import numpy as np
 from osiris.organisms.organism import Organism
 

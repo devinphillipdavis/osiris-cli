@@ -15,7 +15,7 @@ import hashlib
 import time
 from enum import Enum
 from typing import Any, Dict, List, Optional
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from osiris.compiler.dna_ir import (
     IROpType,
