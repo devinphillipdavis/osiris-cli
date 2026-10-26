@@ -1,10 +1,13 @@
 name: OSIRIS CI
 
+# Actions on osiris-dnalang are billing-locked; branches pushed to the
+# devinphillipdavis/osiris-cli fork run CI there.
 on:
   push:
-    branches: [main]
+    branches: ['**']
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 jobs:
   test:
