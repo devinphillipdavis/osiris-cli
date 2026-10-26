@@ -19,20 +19,18 @@
 """
 
 import numpy as np
-from typing import List, Tuple, Optional, Union, Dict, Any
+from typing import List, Tuple, Optional, Dict, Any
 from dataclasses import dataclass, field
 import hashlib
 import time
 
 try:
     from .gates import (
-        helix, cleave, twist, fold, splice, bond, phase_flip,
-        tensor, identity, adjoint, is_unitary
+        helix, cleave, twist, fold, splice, bond, phase_flip
     )
 except ImportError:
     from gates import (
-        helix, cleave, twist, fold, splice, bond, phase_flip,
-        tensor, identity, adjoint, is_unitary
+        helix, cleave, twist, fold, splice, bond, phase_flip
     )
 
 # Physical Constants

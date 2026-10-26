@@ -4,7 +4,6 @@ DNA-Lang Immutable Ledger — Cryptographic lineage tracking for quantum organis
 
 import hashlib
 import json
-import os
 import time
 from typing import Any, Dict, List, Optional
 from dataclasses import dataclass, field, asdict

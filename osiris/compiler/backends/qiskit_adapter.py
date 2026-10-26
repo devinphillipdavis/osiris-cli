@@ -2,7 +2,7 @@
 
 import hashlib
 import time
-from typing import Any, Dict, Optional, Set
+from typing import Any, Optional, Set
 
 from ..dna_ir import (
     IROpType, IROperation, QuantumCircuitIR,
