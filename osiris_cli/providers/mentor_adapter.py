@@ -146,6 +146,8 @@ class ProviderMentorAdapter:
                 resp = self.provider.generate(req)
                 if resp.content:
                     yield resp.content
+                elif resp.error:
+                    raise ConnectionError(f"Provider {self.provider.capabilities().provider_name} error: {resp.error}")
             self.last_done = {"done_reason": "stop"}
         except Exception as e:
             logger.warning(f"Primary mentor streaming error ({type(e).__name__}: {e}), attempting fallback...")

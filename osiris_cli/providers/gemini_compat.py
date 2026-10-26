@@ -152,6 +152,8 @@ class GeminiCompatibilityProvider(BaseModelProvider):
     def stream(self, request: ProviderRequest) -> Iterator[ProviderStreamChunk]:
         resp = self.generate(request)
         if not resp.is_success or not resp.content:
+            if resp.error:
+                raise ConnectionError(f"Gemini error: {resp.error}")
             yield ProviderStreamChunk(
                 text="",
                 is_final=True,
