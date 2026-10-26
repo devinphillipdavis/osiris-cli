@@ -64,7 +64,7 @@ FACTS_FILE = "facts.jsonl"
 # 7B mentor on the same CPU) waits; the marker is refreshed on every message.
 CHAT_MARKER = "chat.active"
 CHAT_QUIET_SECONDS = 300
-MENTOR_MAX_TOKENS = int(os.environ.get("OSIRIS_MENTOR_MAX_TOKENS", "700"))
+MENTOR_MAX_TOKENS = int(os.environ.get("OSIRIS_MENTOR_MAX_TOKENS", "2048"))
 MENTOR_TIMEOUT = float(os.environ.get("OSIRIS_MENTOR_TIMEOUT", "180"))
 CLAIMS_PER_MESSAGE = 3          # registered claims shown before a reply
 MENTOR_NUM_CTX = int(os.environ.get("OSIRIS_MENTOR_NUM_CTX", "4096"))
