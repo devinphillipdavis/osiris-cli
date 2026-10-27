@@ -23,6 +23,7 @@ A major model gateway sovereignty, performance scaling, and living curriculum re
   - Reserved full $O(N)$ Merkle sweeps for block completion and pre-flight gates, speeding up large curriculum checkpoint intervals by over 100x.
 - **Dynamic Output Budget Expansion (`OSIRIS_MENTOR_MAX_TOKENS = 2048`)**:
   - Raised default mentor output budget from 700 to 2,048 tokens, eliminating the `cut off at 700-token limit` truncation penalty that previously caused 30% of complex technical exchanges to be rejected from NCLM core learning.
+  - Raised the default mentor context (`OSIRIS_MENTOR_NUM_CTX`) from 4,096 to 8,192 tokens with it. The prompt budget is `(num_ctx − max_tokens) × 3.5` characters: at 4,096 the larger reply limit cut it from 11,886 to 7,168, and a pasted document no longer fit beside the system prompt. It is 21,504 at 8,192. The Ollama `/api/chat` mentor sends this value; a provider voice served through Ollama's OpenAI-compatible endpoint uses the server's context length (`OLLAMA_CONTEXT_LENGTH`).
 
 ## 3. 1,000-Interaction Advanced Technical Curriculum (`scratch/curriculum_1000.json`)
 
