@@ -73,7 +73,12 @@ CHAT_QUIET_SECONDS = 300
 MENTOR_MAX_TOKENS = int(os.environ.get("OSIRIS_MENTOR_MAX_TOKENS", "2048"))
 MENTOR_TIMEOUT = float(os.environ.get("OSIRIS_MENTOR_TIMEOUT", "180"))
 CLAIMS_PER_MESSAGE = 3          # registered claims shown before a reply
-MENTOR_NUM_CTX = int(os.environ.get("OSIRIS_MENTOR_NUM_CTX", "4096"))
+MENTOR_NUM_CTX = int(os.environ.get("OSIRIS_MENTOR_NUM_CTX", "8192"))
+# 8192 so the 2,048-token reply limit still leaves PROMPT_BUDGET (below) room for the system
+# prompt plus a full MESSAGE_BUDGET excerpt. At 4096 it did not, and a pasted document was
+# dropped from the follow-up that asked about it. Ollama's KV cache grows with num_ctx. Only
+# the /api/chat mentor here sends it; a provider voice (Gemma through Ollama's OpenAI-compatible
+# endpoint) runs at the server's context length (OLLAMA_CONTEXT_LENGTH).
 # A local 7B model on a CPU reads a few thousand tokens per minute and Ollama keeps only
 # num_ctx tokens: a 100k-character paste timed out twice (601 s, 406 s) on 2026-10-01.
 # Long messages go to the mentor as a bounded excerpt; the ledger keeps the full text.
