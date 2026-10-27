@@ -38,6 +38,9 @@ import time
 
 import paste_digest
 
+# Enable package traversal into research/ subdirectories while keeping research.py as a module
+__path__ = [os.path.join(os.path.dirname(__file__), "research")]
+
 ROOT = os.path.join(os.path.expanduser("~"), ".osiris", "research")
 INDEX = os.path.join(ROOT, "research.json")
 MAX_SOURCE_CHARS = 400_000
