@@ -187,9 +187,14 @@ def snapshot_info(where: str) -> dict:
 def load(where: str, with_optimizer: bool = False):
     """(model, optimizer, step) from a snapshot directory or "live"; the same
     architecture and loader as the live core."""
+    return load_files(*snapshot_paths(where), with_optimizer=with_optimizer)
+
+
+def load_files(ckpt: str, meta: str, with_optimizer: bool = False):
+    """(model, optimizer, step) from one checkpoint's .npz and .json, built as
+    the architecture of the folder it is in."""
     import numpy as np
     otc = _console()
-    ckpt, meta = snapshot_paths(where)
     model, opt = otc._organism_build(otc._organism_arch(os.path.dirname(ckpt)))
     with open(meta, encoding="utf-8") as f:
         m = json.load(f)
