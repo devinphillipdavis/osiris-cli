@@ -5,8 +5,6 @@ Connects live quantum execution data with piezo-transducer logic
 Provides Ξ/Λ/Γ metrics for the Samsung Fold Power Stability Dashboard
 """
 
-from flask import Flask, jsonify, request
-from flask_cors import CORS
 import numpy as np
 from scipy.integrate import solve_ivp
 from scipy.linalg import expm
@@ -16,8 +14,33 @@ from dataclasses import dataclass
 from typing import Dict, List, Optional
 import threading
 
-app = Flask(__name__)
-CORS(app)
+try:
+    from flask import Flask, jsonify, request
+    from flask_cors import CORS
+    HAS_FLASK = True
+except ImportError:
+    HAS_FLASK = False
+    Flask = None
+    jsonify = None
+    request = None
+    CORS = None
+
+
+class _DummyApp:
+    def route(self, *args, **kwargs):
+        def decorator(f):
+            return f
+        return decorator
+
+    def run(self, *args, **kwargs):
+        raise RuntimeError("Flask and flask_cors are required to run the Scimitar-Ion API server.")
+
+
+if HAS_FLASK:
+    app = Flask(__name__)
+    CORS(app)
+else:
+    app = _DummyApp()
 
 # Universal Physical Constants (Hardware-Validated)
 LAMBDA_PHI = 2.176435e-8  # Universal Memory Constant (s⁻¹)
@@ -29,15 +52,19 @@ TAU_0_REVIVAL = PHI_GOLDEN ** 8  # τ₀ = φ⁸ ≈ 2584.97 μs
 class QuantumState:
     """11D-CRSM Quantum State Container"""
     rho: np.ndarray  # Density matrix
-    lambda_coherence: float  # Λ (Mean Coherence)
-    phi_consciousness: float  # Φ (Integrated Information)
-    gamma_decoherence: float  # Γ (Decoherence Rate)
-    xi_negentropy: float  # Ξ (Negentropic Ratio)
-    tau_generation: int  # Time evolution step
+    lambda_coherence: float  # Mean off-diagonal magnitude
+    phi_consciousness: float  # Legacy alias for normalized_von_neumann_entropy
+    gamma_decoherence: float  # Legacy alias for purity_defect
+    xi_negentropy: float  # Legacy alias for coherence_to_purity_defect_ratio
+    tau_generation: int  # Time evolution step (microseconds)
     checkpoint: str  # State hash
+    purity_defect: float = 0.0  # 1 - Tr(rho^2), dimensionless purity defect
+    normalized_von_neumann_entropy: float = 0.0  # S(rho) / log2(dim)
+    coherence_to_purity_defect_ratio: float = 0.0  # Lambda / (purity_defect + 1e-6)
+    provenance_tag: str = "simulated_lindblad_model"
 
 class LindbladSolver:
-    """Advanced Lindblad Master Equation Solver with Non-Markovian Extensions"""
+    """Rigorous CPTP Lindblad Master Equation Solver with Explicit Kraus Jump Operators"""
     
     def __init__(self, n_qubits: int = 2, T1: float = 100e-6, T2: float = 50e-6):
         self.n_qubits = n_qubits
@@ -45,70 +72,73 @@ class LindbladSolver:
         self.T1 = T1  # Relaxation time
         self.T2 = T2  # Dephasing time
         
-        # Lindblad operators
+        # Lindblad decay rates
         self.gamma_1 = 1.0 / T1
-        self.gamma_phi = 1.0 / T2 - self.gamma_1 / 2.0
+        self.gamma_phi = max(0.0, 1.0 / T2 - self.gamma_1 / 2.0)
         
-        # Initialize density matrix to |00⟩ state
+        # Initialize density matrix to |00⟩ ground state
         self.rho = np.zeros((self.dim, self.dim), dtype=complex)
         self.rho[0, 0] = 1.0
         
-        # Hamiltonian (example: Ising model with transverse field)
+        # Hamiltonian (Ising model with transverse field)
         self.H = self._construct_hamiltonian()
+        # Explicit jump operators guaranteeing CPTP
+        self.jump_operators = self._build_jump_operators()
+
+    def _build_jump_operators(self) -> List[np.ndarray]:
+        """Construct explicit Kraus/Lindblad jump operators for amplitude damping and dephasing."""
+        sigma_minus = np.array([[0, 1], [0, 0]], dtype=complex)
+        sigma_z = np.array([[1, 0], [0, -1]], dtype=complex)
+        I2 = np.eye(2, dtype=complex)
+        
+        jumps = []
+        for i in range(self.n_qubits):
+            # Amplitude damping: L = sqrt(gamma_1) * sigma^- on qubit i
+            op_amp = np.eye(1, dtype=complex)
+            for j in range(self.n_qubits):
+                op_amp = np.kron(op_amp, sigma_minus if j == i else I2)
+            jumps.append(np.sqrt(self.gamma_1) * op_amp)
+            
+            # Pure dephasing: L = sqrt(gamma_phi / 2) * sigma_z on qubit i
+            if self.gamma_phi > 0:
+                op_dephase = np.eye(1, dtype=complex)
+                for j in range(self.n_qubits):
+                    op_dephase = np.kron(op_dephase, sigma_z if j == i else I2)
+                jumps.append(np.sqrt(self.gamma_phi / 2.0) * op_dephase)
+                
+        return jumps
         
     def _construct_hamiltonian(self) -> np.ndarray:
         """Construct quantum Hamiltonian for the system"""
-        # Pauli matrices
         sigma_x = np.array([[0, 1], [1, 0]], dtype=complex)
         sigma_z = np.array([[1, 0], [0, -1]], dtype=complex)
         I = np.eye(2, dtype=complex)
         
-        # Build n-qubit Hamiltonian
         H = np.zeros((self.dim, self.dim), dtype=complex)
-        
         for i in range(self.n_qubits):
-            # Transverse field term: σ_x^i
             op = np.eye(1, dtype=complex)
             for j in range(self.n_qubits):
-                if j == i:
-                    op = np.kron(op, sigma_x)
-                else:
-                    op = np.kron(op, I)
+                op = np.kron(op, sigma_x if j == i else I)
             H += 0.5 * op.reshape(self.dim, self.dim)
             
-            # Ising coupling: σ_z^i σ_z^(i+1)
             if i < self.n_qubits - 1:
                 op = np.eye(1, dtype=complex)
                 for j in range(self.n_qubits):
-                    if j == i or j == i + 1:
-                        op = np.kron(op, sigma_z)
-                    else:
-                        op = np.kron(op, I)
+                    op = np.kron(op, sigma_z if (j == i or j == i + 1) else I)
                 H += 0.25 * op.reshape(self.dim, self.dim)
         
         return H
     
     def lindblad_rhs(self, t: float, rho_vec: np.ndarray) -> np.ndarray:
-        """Right-hand side of Lindblad Master Equation"""
-        # Reshape vector to density matrix
+        """Exact CPTP Lindblad Master Equation RHS: d(rho)/dt = -i[H, rho] + D(rho)."""
         rho = rho_vec.reshape((self.dim, self.dim))
-        
-        # Hamiltonian evolution: -i[H, ρ]
         commutator = -1j * (self.H @ rho - rho @ self.H)
         
-        # Lindblad dissipator (simplified for amplitude damping + dephasing)
-        # L = γ₁ * σ⁻ (amplitude damping) + γφ * σz (pure dephasing)
-        
-        # For simplicity, model as diagonal decay
-        dissipator = np.zeros_like(rho)
-        for i in range(self.dim):
-            for j in range(self.dim):
-                if i == j:
-                    # Population decay
-                    dissipator[i, i] += -self.gamma_1 * rho[i, i] * (1 if i > 0 else -1)
-                else:
-                    # Coherence decay
-                    dissipator[i, j] += -(self.gamma_1 / 2 + self.gamma_phi) * rho[i, j]
+        dissipator = np.zeros_like(rho, dtype=complex)
+        for L in self.jump_operators:
+            L_dag = L.conj().T
+            L_dag_L = L_dag @ L
+            dissipator += L @ rho @ L_dag - 0.5 * (L_dag_L @ rho + rho @ L_dag_L)
         
         drho_dt = commutator + dissipator
         return drho_dt.flatten()
@@ -160,41 +190,77 @@ class LindbladSolver:
             states.append(state)
         
         return states
+
+    def compute_choi_matrix(self, tau_step: float = 1e-6) -> np.ndarray:
+        """
+        Compute the unnormalized Choi matrix J(E_tau) of the numerical propagator E_tau.
+        J(E) = sum_{i,j=0}^{d-1} |i><j| (x) E(|i><j|)
+        By Choi's theorem, E is completely positive if and only if J(E) >= 0.
+        """
+        d = self.dim
+        choi = np.zeros((d * d, d * d), dtype=complex)
+        
+        for i in range(d):
+            for j in range(d):
+                e_ij = np.zeros((d, d), dtype=complex)
+                e_ij[i, j] = 1.0
+                
+                sol = solve_ivp(
+                    self.lindblad_rhs,
+                    (0, tau_step),
+                    e_ij.flatten(),
+                    method='RK45',
+                    rtol=1e-8,
+                    atol=1e-10
+                )
+                evolved_ij = sol.y[:, -1].reshape((d, d))
+                
+                ket_i_bra_j = np.zeros((d, d), dtype=complex)
+                ket_i_bra_j[i, j] = 1.0
+                choi += np.kron(ket_i_bra_j, evolved_ij)
+                
+        return choi
     
     def _compute_metrics(self, rho: np.ndarray, tau: int) -> QuantumState:
-        """Compute Λ/Φ/Γ/Ξ metrics from density matrix"""
-        # Ensure Hermiticity and normalization
+        """Compute scientifically grounded metrics from density matrix with legacy aliases."""
+        # Ensure Hermiticity and check trace
         rho = (rho + rho.conj().T) / 2
-        rho = rho / np.trace(rho)
+        trace_val = np.real(np.trace(rho))
+        if abs(trace_val - 1.0) > 1e-6 and trace_val > 0:
+            rho = rho / trace_val
         
-        # Λ (Coherence): Sum of off-diagonal magnitudes
+        # Mean magnitude of off-diagonal elements
         coherence_sum = np.sum(np.abs(rho - np.diag(np.diag(rho))))
-        lambda_coherence = coherence_sum / (self.dim * (self.dim - 1))
+        lambda_coherence = float(coherence_sum / (self.dim * (self.dim - 1)))
         
-        # Φ (Consciousness): Von Neumann entropy-based
+        # Normalized von Neumann entropy
         eigenvalues = np.linalg.eigvalsh(rho)
-        eigenvalues = eigenvalues[eigenvalues > 1e-12]  # Filter numerical zeros
-        phi_consciousness = -np.sum(eigenvalues * np.log2(eigenvalues + 1e-12))
-        phi_consciousness = phi_consciousness / np.log2(self.dim)  # Normalize
+        pos_eigs = eigenvalues[eigenvalues > 1e-14]
+        entropy = -float(np.sum(pos_eigs * np.log2(pos_eigs))) if len(pos_eigs) > 0 else 0.0
+        norm_entropy = float(entropy / np.log2(self.dim))
         
-        # Γ (Decoherence): Rate of purity loss
-        purity = np.real(np.trace(rho @ rho))
-        gamma_decoherence = 1.0 - purity
+        # Dimensionless purity defect: 1 - Tr(rho^2)
+        purity = float(np.real(np.trace(rho @ rho)))
+        purity_defect = float(max(0.0, 1.0 - purity))
         
-        # Ξ (Negentropy): Ratio of coherence to decoherence
-        xi_negentropy = lambda_coherence / (gamma_decoherence + 1e-6)
+        # Coherence-to-Purity-Defect Ratio (regularized by epsilon=1e-6)
+        cir_ratio = float(lambda_coherence / (purity_defect + 1e-6))
         
         # Generate checkpoint hash
         checkpoint = f"CHK_{tau:06d}_{hash(rho.tobytes()) & 0xFFFFFF:06x}"
         
         return QuantumState(
             rho=rho,
-            lambda_coherence=float(lambda_coherence),
-            phi_consciousness=float(phi_consciousness),
-            gamma_decoherence=float(gamma_decoherence),
-            xi_negentropy=float(xi_negentropy),
+            lambda_coherence=lambda_coherence,
+            phi_consciousness=norm_entropy,  # Legacy alias
+            gamma_decoherence=purity_defect,  # Legacy alias
+            xi_negentropy=cir_ratio,          # Legacy alias
             tau_generation=tau,
-            checkpoint=checkpoint
+            checkpoint=checkpoint,
+            purity_defect=purity_defect,
+            normalized_von_neumann_entropy=norm_entropy,
+            coherence_to_purity_defect_ratio=cir_ratio,
+            provenance_tag="simulated_lindblad_model"
         )
 
 # Global state manager
@@ -270,7 +336,12 @@ def get_status():
         "lambdaPhi": LAMBDA_PHI,
         "tauRevival": TAU_0_REVIVAL,
         "powerStability": state.lambda_coherence * (1 - state.gamma_decoherence),
-        "negentropicRecovery": state.xi_negentropy / 7.08 * 100  # Normalize to target Ξ=7.08
+        "coherence_to_purity_defect_ratio": state.coherence_to_purity_defect_ratio,
+        "purity_defect": state.purity_defect,
+        "normalized_von_neumann_entropy": state.normalized_von_neumann_entropy,
+        "provenance_tag": state.provenance_tag,
+        "claims_firewall_status": "SYS-024_QUARANTINED",
+        "negentropicRecovery": state.xi_negentropy / 7.08 * 100  # Legacy display metric
     })
 
 @app.route('/api/scimitar-ion/sweep/start', methods=['POST'])
