@@ -30,6 +30,13 @@ class MeasurementRun:
     operating_conditions: Dict[str, Any] = field(default_factory=dict)
     posterior_replicas: List[float] = field(default_factory=list)  # [y_{k,s}^rep] for s=1..S
 
+    # QPU Evidence Binding (SYS-022, SYS-023)
+    circuit_id: str = ""
+    backend: str = ""
+    job_id: str = ""
+    calibration_hash: str = ""
+    model_version: str = "v1"
+
     @property
     def standardized_residual(self) -> float:
         """r_k^obs = (y_k^obs - E[y_k | theta]) / sigma_k"""
@@ -77,6 +84,9 @@ class CalibrationDriftReport:
     drift_detected: bool
     recalibration_required: bool
     provenance_tag: str = "temporal_spc_audit"
+    session_ids: List[str] = field(default_factory=list)
+    qpu_backends: List[str] = field(default_factory=list)
+    calibration_hashes: List[str] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -362,7 +372,9 @@ class TimeOrderedSPCValidator:
         )
         recalibration_required = cusum_res.detected or tripped_count >= 2
 
-        sessions = set(r.session_id for r in runs)
+        sessions = sorted(list(set(r.session_id for r in runs)))
+        backends = sorted(list(set(r.backend for r in runs if r.backend)))
+        cal_hashes = sorted(list(set(r.calibration_hash for r in runs if r.calibration_hash)))
 
         return CalibrationDriftReport(
             temporal_ordering_verified=True,
@@ -375,6 +387,9 @@ class TimeOrderedSPCValidator:
             cusum_signature=cusum_res,
             drift_detected=any_drift,
             recalibration_required=recalibration_required,
+            session_ids=sessions,
+            qpu_backends=backends,
+            calibration_hashes=cal_hashes,
         )
 
 
