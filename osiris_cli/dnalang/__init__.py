@@ -3,6 +3,11 @@ OSIRIS DNA-Lang Recursive Evolution Engine
 ==========================================
 """
 
+from .falsification import (
+    AdversarialFalsificationEngine,
+    FalsificationReceipt,
+    NullControlResult,
+)
 from .loop import (
     CandidateEvolutionLoop,
     GenomeCandidate,
@@ -19,4 +24,7 @@ __all__ = [
     "LineageRecord",
     "EvaluationReceipt",
     "PromotionPolicy",
+    "AdversarialFalsificationEngine",
+    "FalsificationReceipt",
+    "NullControlResult",
 ]
