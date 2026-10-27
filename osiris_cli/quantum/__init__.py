@@ -11,6 +11,14 @@ from .pub_mapper import (
     OperationalMerkleLedger,
     IBMPubMapper,
 )
+from .calibration_spc import (
+    MeasurementRun,
+    CUSUMConfig,
+    DriftSignatureResult,
+    CalibrationDriftReport,
+    TimeOrderedSPCValidator,
+    verify_subsystem_calibrations,
+)
 
 __all__ = [
     "CircuitSpec",
@@ -19,4 +27,10 @@ __all__ = [
     "ExperimentMappingReceipt",
     "OperationalMerkleLedger",
     "IBMPubMapper",
+    "MeasurementRun",
+    "CUSUMConfig",
+    "DriftSignatureResult",
+    "CalibrationDriftReport",
+    "TimeOrderedSPCValidator",
+    "verify_subsystem_calibrations",
 ]
