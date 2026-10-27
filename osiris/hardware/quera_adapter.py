@@ -72,7 +72,7 @@ class QuEraCorrelatedAdapter:
 
     def run_dry(self, n_qubits: Optional[int] = None) -> Dict[str, Any]:
         nq = n_qubits or self.distance ** 2
-        error_map = self.build_error_map(nq)
+        self.build_error_map(nq)
         syndromes = self.generate_round_syndromes(nq)
         merged = self.correlated_merge_rounds(syndromes)
         correction = self.decode_merged(merged)

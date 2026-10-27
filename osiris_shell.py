@@ -815,6 +815,15 @@ def process_input(user_input: str, intent_engine) -> str:
 
 
 def main():
+    """Superseded: the one interactive surface is the OSIRIS REPL (osiris_cli.osiris_repl,
+    the `osiris` command). OSIRIS_LEGACY_SHELL=1 runs this NCLLM swarm shell instead."""
+    if os.environ.get("OSIRIS_LEGACY_SHELL") != "1":
+        from osiris_cli.osiris_repl import main as repl_main
+        return repl_main([])
+    return legacy_main()
+
+
+def legacy_main():
     """Main REPL loop."""
     # Handle Ctrl+C gracefully
     def sigint_handler(sig, frame):

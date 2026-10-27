@@ -9,13 +9,12 @@ quantum Darwinism evolutionary fitness.
 Framework: DNA::}{::lang v51.843
 """
 
-import asyncio
 import hashlib
 import math
 import random
 import time
 import logging
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
 

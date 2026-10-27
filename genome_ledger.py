@@ -6,7 +6,10 @@ changes (applied writes, generation bumps), stored as JSON Lines at
 
 A thin wrapper over dnalang-core's Ledger (canonical JSON, SHA-256 over
 prev + entry, one line per entry, written with "a" so earlier lines are
-never rewritten), plus an exclusive file lock around each append.
+never rewritten), plus exclusive locks around each append: the
+<ledger>.lock sidecar that older copies of this module take, then
+osiris_cli.chain_lock's lock on the ledger itself, which every other
+chained writer of the file takes.
 
 Replaces the story #22 version (commit e8efa5e), which kept its chain in
 memory and rewrote the whole file on every save: a new GenomeLedger on an
@@ -31,7 +34,9 @@ import importlib.util
 import json
 import os
 
-HOME_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+from osiris_cli import chain_lock
+
+HOME_DIR =os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # Same convention as genome.json and the backlog (~/.osiris); the dnalang
 # source below is located from this file instead.
 DEFAULT_PATH = os.path.join(os.path.expanduser("~"), ".osiris", "genome_ledger.jsonl")
@@ -187,38 +192,45 @@ class GenomeLedger:
 
     def append(self, entry_type, payload):
         """Appends one entry {prev, ts, kind, payload, hash} and returns it.
-        The lock keeps two processes from both reading the same tip and
-        forking the chain."""
+        The locks keep two writers from both reading the same tip and forking
+        the chain. Both are taken, always in this order: the sidecar excludes
+        older copies of this module (Termux runs its own), and chain_lock
+        excludes every writer that goes through it. A tail chain_lock cannot
+        read raises ChainTailError before anything is written."""
         with open(self.filepath + ".lock", "w") as lock:
             fcntl.flock(lock, fcntl.LOCK_EX)
             try:
-                size_before = os.path.getsize(self.filepath)
-                try:
-                    entry = self._ledger.append(entry_type, {"payload": payload})
-                    # Durable before it is acknowledged: /apply treats a returned
-                    # entry as the commit point of the write it records.
-                    with open(self.filepath, "a", encoding="utf-8") as f:
-                        os.fsync(f.fileno())
-                except BaseException as append_error:
-                    # The line may already be in the file even though the append
-                    # failed (e.g. fsync raised). An unacknowledged entry must not
-                    # survive: /apply rolls its write back on this exception, and
-                    # a leftover record would claim a change that was undone.
-                    try:
-                        os.truncate(self.filepath, size_before)
-                        with open(self.filepath, "a", encoding="utf-8") as f:
-                            os.fsync(f.fileno())
-                    except BaseException as truncate_error:
-                        raise LedgerAppendUnknown(
-                            f"append failed ({type(append_error).__name__}: {append_error}) and removing "
-                            f"its line failed ({type(truncate_error).__name__}: {truncate_error}); "
-                            f"expected size {size_before}, actual "
-                            f"{os.path.getsize(self.filepath) if os.path.exists(self.filepath) else 'missing'}"
-                        ) from append_error
-                    raise
-                return entry
+                with chain_lock.locked_tail(self.filepath):
+                    return self._append_locked(entry_type, payload)
             finally:
                 fcntl.flock(lock, fcntl.LOCK_UN)
+
+    def _append_locked(self, entry_type, payload):
+        size_before = os.path.getsize(self.filepath)
+        try:
+            entry = self._ledger.append(entry_type, {"payload": payload})
+            # Durable before it is acknowledged: /apply treats a returned
+            # entry as the commit point of the write it records.
+            with open(self.filepath, "a", encoding="utf-8") as f:
+                os.fsync(f.fileno())
+        except BaseException as append_error:
+            # The line may already be in the file even though the append
+            # failed (e.g. fsync raised). An unacknowledged entry must not
+            # survive: /apply rolls its write back on this exception, and
+            # a leftover record would claim a change that was undone.
+            try:
+                os.truncate(self.filepath, size_before)
+                with open(self.filepath, "a", encoding="utf-8") as f:
+                    os.fsync(f.fileno())
+            except BaseException as truncate_error:
+                raise LedgerAppendUnknown(
+                    f"append failed ({type(append_error).__name__}: {append_error}) and removing "
+                    f"its line failed ({type(truncate_error).__name__}: {truncate_error}); "
+                    f"expected size {size_before}, actual "
+                    f"{os.path.getsize(self.filepath) if os.path.exists(self.filepath) else 'missing'}"
+                ) from append_error
+            raise
+        return entry
 
     def verify(self):
         """True if every entry's prev/hash re-derive correctly (see check_chain for the one attested

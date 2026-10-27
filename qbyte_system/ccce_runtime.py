@@ -32,9 +32,9 @@ import time
 import hashlib
 
 try:
-    from .phase_conjugate import PhaseConjugateEngine, PhaseConjugateConfig
+    from .phase_conjugate import PhaseConjugateEngine
 except ImportError:
-    from phase_conjugate import PhaseConjugateEngine, PhaseConjugateConfig
+    from phase_conjugate import PhaseConjugateEngine
 
 # Physical Constants
 LAMBDA_PHI = 2.176435e-8

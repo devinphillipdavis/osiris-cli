@@ -36,6 +36,8 @@ LAYERS = (
         ("governed intake: records every exchange; learns only from eligible material you explicitly approve",
          "osiris_cli/paste_learning.py · osiris_cli/living.py · osiris_cli/osiris_repl.py"),
         ("a paste is one message, however the terminal splits it", "bracketed paste · living.keys_typed"),
+        ("keys typed while a command prints are held, not echoed into its output",
+         "living.TypeAhead · osiris_repl.dispatch_capturing"),
         ("long pastes go to the model as a bounded excerpt", "living.Osiris.excerpt"),
         ("what changed since the last session", "session_state.py"),
     ), ("a run ID per task carrying its permissions and budget",)),
@@ -61,6 +63,8 @@ LAYERS = (
         ("draft proposer: spec → candidate code (unpromoted assistant)", "osiris_termux_console._synthesize"),
         ("mentor voice, warmed at start-up, fast voice for long messages", "living.OllamaMentor"),
         ("experiment brief, simulator first", "/experiment"),
+        ("tool loop: confined reads, writes proposed for /apply, commands approved one by one",
+         "osiris_cli/code_agent.py · /code"),
     ), ("baseline, alternative and conservative candidates side by side",)),
     Layer("L5", "Verify", (
         ("sandboxed test run after a static AST check", "osiris_termux_console._run_sandboxed_test · /why"),

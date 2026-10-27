@@ -1,0 +1,35 @@
+{
+  "source_document": "source_document.txt",
+  "title": "The Fine-Structure Constant as an A-Field Quantity: Impedance, Flux, and the Pair Structure of Its Prefactor",
+  "date": "2026-10-12",
+  "sha256": "1b5199629924c612e30fbd0ae7b2e22cb0896e889ad0fde2b5aaf8d291e653a1",
+  "byte_size": 1827,
+  "ingestion_timestamp_utc": "2026-10-27T02:22:16Z",
+  "ontological_firewall": {
+    "raw_claims_preserved": true,
+    "osiris_evaluation_isolated": true,
+    "interpretation_contamination_prevented": true
+  },
+  "raw_claims": [
+    {
+      "claim_id": "RAW-001",
+      "statement": "alpha = Z_0 / (2 * R_K) = (1/4) * G_0 * Z_0 = (e * Z_0) / (4 * Phi_0) = (h * Z_0) / (8 * Phi_0^2)",
+      "claimed_type": "exact_mathematical_identity"
+    },
+    {
+      "claim_id": "RAW-002",
+      "statement": "prefactor = (1/2) * (1/2)^n where n counts pairing factors in the chosen representation",
+      "claimed_type": "representation_pairing_rule"
+    },
+    {
+      "claim_id": "RAW-003",
+      "statement": "The invariant factor 1/2 physically represents an outgoing-and-returning A-field pair",
+      "claimed_type": "physical_interpretation_hypothesis"
+    },
+    {
+      "claim_id": "RAW-004",
+      "statement": "Geometric equality 4*pi*r^2 = (2*pi*r)*(2*r) illustrates the A-field pairing structure",
+      "claimed_type": "geometric_analogy"
+    }
+  ]
+}

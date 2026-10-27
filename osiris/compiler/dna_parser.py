@@ -3,7 +3,7 @@ DNA-Lang Parser — Lexer and AST generation for quantum consciousness organisms
 """
 
 import re
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, List, Optional, Tuple
 from dataclasses import dataclass, field
 from enum import Enum
 

@@ -43,7 +43,7 @@ class DualNodeSyncBridge:
 
         if is_arm64 and (is_termux or is_proot or os.path.exists("/data/data/com.termux")):
             node_id = "Node Alpha"
-            node_role = "Mobile Edge Substrate (Fold7 / Termux)"
+            node_role = "Mobile Edge Substrate (Termux / PRoot)"
         elif is_arm64:
             node_id = "Node Alpha (Edge ARM64)"
             node_role = "Edge Substrate"

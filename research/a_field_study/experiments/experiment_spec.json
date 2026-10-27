@@ -1,0 +1,68 @@
+{
+  "framework": "OSIRIS Pre-Registration & Falsification Engine",
+  "governance": "SYS-022 / SYS-023 / SYS-024",
+  "organism_id": "alpha_a_field_study",
+  "provenance_standards": {
+    "cavity_architecture_reference": "Paik et al., Phys. Rev. Lett. 107, 240501 (2011); Reagor et al., Phys. Rev. B 94, 014506 (2016)",
+    "fluxoid_mesoscopic_reference": "Landauer, IBM J. Res. Dev. 1, 223 (1957); Buttiker, Phys. Rev. Lett. 57, 1761 (1986)"
+  },
+  "experiments": [
+    {
+      "experiment_id": "EXP-AFIELD-01",
+      "title": "Cryogenic Superconducting Niobium 3D Cavity Impedance Transmission Test",
+      "target_claim": "ALPHA-CLAIM-003",
+      "hardware_substrate": {
+        "cavity_material": "High-Purity Niobium (RRR > 300)",
+        "cavity_mode": "TE011 cylindrical eigenmode",
+        "geometry": {
+          "radius_cm": 2.50,
+          "length_cm": 5.00
+        },
+        "operating_temperature_mK": 20.0,
+        "fundamental_frequency_GHz": 5.000000000,
+        "intrinsic_quality_factor": 2.0e8,
+        "cavity_linewidth_Hz": 25.0,
+        "perturbation_mechanism": "High-purity sapphire dielectric pin (epsilon_r = 11.5, diameter = 1.0 mm, variable axial/angular displacement)"
+      },
+      "hypothesis": "H1: The prefactor 1/2 in Z_0/(2*R_K) generates an anomalous physical boundary phase pull Delta_phi = (1/2)*(Z_0/R_K) manifesting as an anisotropic cavity frequency shift delta_f.",
+      "null_hypothesis": "H0: Transmission across cavity boundaries obeys standard Maxwell-Fresnel boundary conditions with zero anomalous prefactor shift (Delta_phi = 0).",
+      "baseline": "Standard Maxwell-Fresnel boundary eigenmode calculations in high-purity Nb cavity.",
+      "expected_observable": "Anomalous resonant frequency shift delta_f / f_0 as a function of perturbation angle theta.",
+      "measurement_uncertainty": {
+        "target_sigma_Hz": 0.5,
+        "relative_sigma": 1.0e-10,
+        "confidence_interval": "99.73% (3-sigma = 1.5 Hz)"
+      },
+      "controls": {
+        "negative_control": "Impedance-matched 50-Ohm cryogenic coaxial transmission line (zero resonant cavity).",
+        "positive_control": "Symmetric Fabry-Perot cavity with calibrated sapphire dielectric translation."
+      },
+      "falsification_criterion": "If measured anomalous frequency shift |delta_f_anom| <= 3.0 * sigma_Hz (<= 1.5 Hz, or delta_f/f_0 <= 3.0e-10), H1 is ruled out and the physical field-pair interpretation is formally REFUTED."
+    },
+    {
+      "experiment_id": "EXP-AFIELD-02",
+      "title": "Hybrid Normal-Superconducting Ring Aharonov-Bohm Phase Slip",
+      "target_claim": "ALPHA-CLAIM-002",
+      "hardware_substrate": {
+        "ring_materials": "Bimetallic Al (superconducting, Tc = 1.2 K) / Cu (normal) lithographic ring",
+        "ring_diameter_um": 1.5,
+        "wire_width_nm": 60,
+        "operating_temperature_mK": 20.0,
+        "applied_field_range_mT": [-2.0, 2.0]
+      },
+      "hypothesis": "H1: The pairing factor (1/2)^n produces intermediate fractional fluxoid conductance oscillations at (1/4)*Phi_0 in hybrid ring geometries.",
+      "null_hypothesis": "H0: Fluxoid quantization transitions strictly between h/e and h/2e according to BCS pairing order parameter Psi with zero fractional intermediate states.",
+      "baseline": "Mesoscopic Landauer-Buttiker conductance oscillations under external magnetic flux.",
+      "expected_observable": "Fourier amplitude of magnetoconductance at flux frequencies f = 1/Phi_0 and f = 2/Phi_0.",
+      "measurement_uncertainty": {
+        "target_sigma": 0.005,
+        "confidence_interval": "99.9%"
+      },
+      "controls": {
+        "negative_control": "Normal copper ring (pure h/e period).",
+        "positive_control": "Continuous aluminum superconducting ring (pure h/2e period)."
+      },
+      "falsification_criterion": "If Fourier spectrum exhibits zero amplitude at 4/Phi_0 (fractional prefactor) within 3-sigma noise floor, H1 is formally REFUTED."
+    }
+  ]
+}

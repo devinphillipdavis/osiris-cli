@@ -3,8 +3,8 @@ DNA-Lang Intermediate Representation — AST to executable quantum circuit IR.
 """
 
 import hashlib
-from typing import Any, Dict, List, Optional, Tuple
-from dataclasses import dataclass, field, asdict
+from typing import Any, Dict, List, Optional
+from dataclasses import dataclass, field
 from enum import Enum
 
 

@@ -27,12 +27,37 @@ from .base import (
     ProviderStreamChunk,
 )
 
+DEFAULT_OLLAMA_URL = "http://localhost:11434"
+
+
+def ollama_base_url(raw: Optional[str] = None) -> str:
+    """A client URL from OLLAMA_HOST, which follows the server's convention: it may be a bare
+    host, host:port, or a bind address such as 0.0.0.0 (listen everywhere) -- none of which is
+    a URL a client can call as-is."""
+    raw = (os.environ.get("OLLAMA_HOST", "") if raw is None else raw).strip().rstrip("/")
+    if not raw:
+        return DEFAULT_OLLAMA_URL
+    if "://" not in raw:
+        raw = "http://" + raw
+    scheme, rest = raw.split("://", 1)
+    hostport, sep, path = rest.partition("/")
+    if hostport.startswith("["):
+        host, _, port = hostport[1:].partition("]")
+        port = port.lstrip(":")
+        host = f"[{host}]"
+    else:
+        host, _, port = hostport.partition(":")
+    if host in ("", "0.0.0.0", "[::]"):
+        host = "127.0.0.1"
+    port = port or ("443" if scheme == "https" else "11434")
+    return f"{scheme}://{host}:{port}" + (f"/{path}" if sep and path else "")
+
 
 class OllamaCompatibilityProvider(BaseModelProvider):
     """Wraps Ollama HTTP API conforming to BaseModelProvider."""
 
     def __init__(self, host: Optional[str] = None, model: str = "qwen2.5:1.5b", timeout: float = 60.0):
-        self.host = (host or os.environ.get("OLLAMA_HOST", "http://localhost:11434")).rstrip("/")
+        self.host = ollama_base_url(host)
         self.selected_model = model
         self.timeout = timeout
         self.cancelled_requests: set[str] = set()
@@ -155,6 +180,52 @@ class OllamaCompatibilityProvider(BaseModelProvider):
                 error=f"Ollama call failed: {e}",
                 total_duration_ms=(time.monotonic() - t0) * 1000.0,
             )
+
+    def chat(self, request: ProviderRequest) -> ProviderResponse:
+        """Multi-turn /api/chat. ``request.tools`` are offered to the model and any native
+        tool calls come back in ``ProviderResponse.tool_calls``. A message's metadata may
+        carry ``tool_calls`` (assistant turns) or ``name`` (tool results). Never raises."""
+        t0 = time.monotonic()
+        model = request.model or self.selected_model
+        messages = []
+        if request.system:
+            messages.append({"role": "system", "content": request.system})
+        for m in request.messages:
+            entry = {"role": m.role, "content": m.content}
+            entry.update({k: v for k, v in (m.metadata or {}).items() if k in ("tool_calls", "name")})
+            messages.append(entry)
+        payload = {
+            "model": model,
+            "messages": messages,
+            "stream": False,
+            "options": {"num_predict": request.max_tokens, "temperature": request.temperature},
+        }
+        if request.tools:
+            payload["tools"] = request.tools
+
+        req = urllib.request.Request(f"{self.host}/api/chat", data=json.dumps(payload).encode(),
+                                     headers={"Content-Type": "application/json"}, method="POST")
+        try:
+            with urllib.request.urlopen(req, timeout=request.timeout) as resp:
+                data = json.loads(resp.read().decode())
+        except Exception as e:  # noqa: BLE001 - errors are returned, never raised
+            return ProviderResponse(
+                content="", model=model, provider="ollama_compat", request_id=request.request_id,
+                finish_reason=FinishReason.ERROR, error=f"Ollama chat failed: {e}",
+                total_duration_ms=(time.monotonic() - t0) * 1000.0,
+            )
+        message = data.get("message") or {}
+        return ProviderResponse(
+            content=message.get("content", "") or "",
+            model=model,
+            provider="ollama_compat",
+            request_id=request.request_id,
+            finish_reason=FinishReason.STOP if data.get("done") else FinishReason.LENGTH,
+            eval_count=data.get("eval_count", 0),
+            prompt_eval_count=data.get("prompt_eval_count", 0),
+            total_duration_ms=(time.monotonic() - t0) * 1000.0,
+            tool_calls=message.get("tool_calls") or None,
+        )
 
     def stream(self, request: ProviderRequest) -> Iterator[ProviderStreamChunk]:
         resp = self.generate(request)

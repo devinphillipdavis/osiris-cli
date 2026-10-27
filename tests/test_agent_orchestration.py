@@ -9,6 +9,7 @@ Verifies:
   - End-to-end pipeline execution and audit receipt chain
 """
 
+import os
 import time
 import pytest
 
@@ -22,6 +23,8 @@ from osiris_cli.orchestration import (
     TaskSpec,
 )
 from osiris_cli.providers import GemmaProvider
+
+FIXTURE_LEDGER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures", "dnalang_ledger_v0_2_0.py")
 
 
 def test_intent_agent_classification():
@@ -128,8 +131,13 @@ def test_payload_bound_authorization_sys021():
     assert "Missing execution grant" in msg
 
 
-def test_end_to_end_governed_engine(tmp_path):
+def test_end_to_end_governed_engine(tmp_path, monkeypatch):
     """Verify full governed loop: intent -> plan -> synthesis -> verification -> ledger."""
+    import genome_ledger as gl
+
+    if not os.path.exists(gl.LEDGER_SRC):  # no dnalang-core: use the pinned ledger.py
+        monkeypatch.setattr(gl, "LEDGER_SRC", FIXTURE_LEDGER)
+        monkeypatch.setattr(gl, "_ledger_mod", None)
     ledger_file = str(tmp_path / "test_ledger.jsonl")
     provider = GemmaProvider(model="gemma-3-1b", mode="mock")
     engine = GovernedAgentEngine(
@@ -148,6 +156,10 @@ def test_end_to_end_governed_engine(tmp_path):
     assert result["authorized"] is False  # Stopped at authorization gate (no grant)
     assert len(result["payload_digest"]) == 64
     assert len(result["ledger_receipt_hash"]) == 64
+    led = gl.GenomeLedger(ledger_file)
+    assert led.tip() == result["ledger_receipt_hash"]
+    assert led.chain[-1]["kind"] == "governed_agent_step"
+    assert led.verify()
 
     # Now authorize with exact payload digest
     grant = ExecutionGrant(

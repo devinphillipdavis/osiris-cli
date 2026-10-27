@@ -168,3 +168,11 @@ def test_project_backend_regional_and_missing_token(monkeypatch):
     t, sent = fake()
     g.generate("hi", purpose="t", transport=t)
     assert sent["url"].startswith("https://europe-west1-aiplatform.googleapis.com/v1/projects/my-proj/locations/europe-west1/")
+
+
+def test_project_backend_unauthenticated_falls_back_to_available_api_key(monkeypatch):
+    monkeypatch.setattr(g, "_gcloud", lambda: "/usr/bin/gcloud")
+    monkeypatch.setenv("OSIRIS_GCP_PROJECT", "my-proj")
+    monkeypatch.setattr(g, "_gcp_token", lambda: "")
+    monkeypatch.setenv("GEMINI_API_KEY", VTX_KEY)
+    assert g.choose_backend() == "vertex"

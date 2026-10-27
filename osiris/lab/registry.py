@@ -8,7 +8,6 @@ from enum import Enum
 import time
 import json
 import os
-import hashlib
 
 
 class ExperimentType(Enum):
