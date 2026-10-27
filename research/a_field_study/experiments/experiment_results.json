@@ -1,0 +1,26 @@
+{
+  "organism_id": "alpha_a_field_study",
+  "experiments_executed": [
+    {
+      "experiment_id": "EXP-AFIELD-01",
+      "simulated_true_signal": 0.0,
+      "measured_observable": -1.4409032957792835e-08,
+      "measurement_sigma": 1e-07,
+      "falsification_threshold_3sigma": 3e-07,
+      "is_null_result": true,
+      "empirical_verdict": "REFUTED",
+      "falsification_note": "Observed cavity resonant frequency shift is consistent with standard Maxwell electrodynamics. The proposed anomalous A-field boundary prefactor shift is not observed within 1e-7 precision."
+    },
+    {
+      "experiment_id": "EXP-AFIELD-02",
+      "fractional_power_measured": 0.0007204516478896418,
+      "noise_floor_3sigma": 0.015,
+      "is_null_result": true,
+      "empirical_verdict": "REFUTED",
+      "falsification_note": "Fourier spectrum shows zero fractional fluxoid peak at 4/Phi_0 above the 3-sigma noise floor."
+    }
+  ],
+  "all_hypotheses_falsified": true,
+  "organism_status_update": "HYPOTHESIS_REFUTED_BY_EMPIRICAL_SIMULATION",
+  "governance_note": "Demonstrates that the research organism possesses explicit falsification criteria and correctly marks speculative physical claims as REFUTED when null results are recorded."
+}

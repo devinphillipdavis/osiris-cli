@@ -1,0 +1,43 @@
+{
+  "framework": "OSIRIS Pre-Registration & Falsification Engine",
+  "governance": "SYS-023 / SYS-024",
+  "organism_id": "alpha_a_field_study",
+  "experiments": [
+    {
+      "experiment_id": "EXP-AFIELD-01",
+      "title": "Cryogenic Microwave Cavity Impedance Transmission Test",
+      "target_claim": "ALPHA-CLAIM-003",
+      "hypothesis": "H1: The prefactor 1/2 in Z_0/(2*R_K) generates a physical boundary phase shift Delta_phi = (1/2)*(Z_0/R_K) in an asymmetric microwave cavity.",
+      "null_hypothesis": "H0: Transmission across cavity boundaries obeys standard Maxwell-Fresnel boundary conditions with zero anomalous prefactor shift (Delta_phi = 0).",
+      "baseline": "Standard QED Maxwell wave equation eigenmodes in superconducting niobium cavity (Q > 10^9).",
+      "expected_observable": "Anomalous resonant frequency shift delta_f / f_0 and boundary phase lag Delta_phi.",
+      "measurement_uncertainty": {
+        "target_sigma": 1e-7,
+        "confidence_interval": "99.7% (3-sigma)"
+      },
+      "controls": {
+        "negative_control": "Impedance-matched 50-Ohm cryogenic coaxial line (zero resonant cavity).",
+        "positive_control": "Symmetric Fabry-Perot cavity with calibrated sapphire dielectric perturbation."
+      },
+      "falsification_criterion": "If measured |delta_f / f_0| <= 3.0 * sigma (no anomalous shift detected above 1e-7), H1 is ruled out and the physical field-pair interpretation is formally REFUTED."
+    },
+    {
+      "experiment_id": "EXP-AFIELD-02",
+      "title": "Hybrid Normal-Superconducting Ring Aharonov-Bohm Phase Slip",
+      "target_claim": "ALPHA-CLAIM-002",
+      "hypothesis": "H1: The pairing factor (1/2)^n produces intermediate fractional fluxoid conductance oscillations at (1/4)*Phi_0 in hybrid ring geometries.",
+      "null_hypothesis": "H0: Fluxoid quantization transitions strictly between h/e and h/2e according to BCS pairing order parameter Psi with zero fractional intermediate states.",
+      "baseline": "Mesoscopic Landauer-Buttiker conductance oscillations under external magnetic flux.",
+      "expected_observable": "Fourier amplitude of magnetoconductance at flux frequencies f = 1/Phi_0 and f = 2/Phi_0.",
+      "measurement_uncertainty": {
+        "target_sigma": 0.005,
+        "confidence_interval": "99.9%"
+      },
+      "controls": {
+        "negative_control": "Normal copper ring (pure h/e period).",
+        "positive_control": "Continuous aluminum superconducting ring (pure h/2e period)."
+      },
+      "falsification_criterion": "If Fourier spectrum exhibits zero amplitude at 4/Phi_0 (fractional prefactor) within 3-sigma noise floor, H1 is formally REFUTED."
+    }
+  ]
+}
