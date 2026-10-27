@@ -21,45 +21,84 @@ import osiris_termux_console as console
 from osiris_cli.osiris_repl import SESSION, PowerGovernor, execute_mesh
 
 
-def test_scorecard_integrity_exclusions_and_quarantine():
+SUITE, RUNNER = "s" * 64, "r" * 64
+MENTOR = {"backend": "ollama", "model": "qwen2.5-coder:7b"}
+
+
+def _write_bench_ledger(bench_dir, runs):
+    """A hash-chained results ledger (protege.load_ledger's rule): one
+    bench_run_start and one bench_task per (task, row) for each run."""
+    entries, prev = [], protege.GENESIS
+    for run_id, rows in runs:
+        bodies = [dict(kind="bench_run_start", run_id=run_id, suite_sha256=SUITE,
+                       runner_sha256=RUNNER, **MENTOR)]
+        bodies += [dict(kind="bench_task", run_id=run_id, task=f"t{i}", result={"attempts": [row]})
+                   for i, row in enumerate(rows)]
+        for body in bodies:
+            h = protege.hashlib.sha256((prev + protege._canon(body)).encode()).hexdigest()
+            entries.append(dict(body, prev=prev, hash=h))
+            prev = h
+    bench_dir.mkdir(parents=True, exist_ok=True)
+    with open(bench_dir / "results.ledger.jsonl", "w", encoding="utf-8") as f:
+        f.write("".join(json.dumps(e) + "\n" for e in entries))
+
+
+def test_scorecard_integrity_exclusions_and_quarantine(tmp_path):
     """Verify that 0.0s unreachable rounds and quarantined runs are excluded from capability scores."""
-    entries, problem = protege.load_ledger()
+    no_output = {"n": 1, "own_ok": False, "hidden_ok": False, "module_sha256": None}
+    _write_bench_ledger(tmp_path, [
+        ("genuine", [no_output] * 3),                                   # scored: 3 verified fails
+        ("dropped", [dict(no_output, hidden_reason="<urlopen error [Errno 111] Connection refused>"),
+                     dict(no_output, unreachable=True)]),              # infrastructure, not the model
+        ("quarantined", [no_output]),                                   # registered quarantine
+    ])
+    (tmp_path / "quarantine.json").write_text(json.dumps({"quarantined_runs": {"quarantined": "0.0s"}}))
+
+    entries, problem = protege.load_ledger(str(tmp_path))
     assert not problem, f"Ledger error: {problem}"
-    
-    suite = protege.current_suite()
-    runner = protege.current_runner()
-    cands, skipped = protege.candidates(entries, suite, runner)
+
+    cands, skipped = protege.candidates(entries, SUITE, RUNNER, bench_dir=str(tmp_path))
     card = protege.scorecard(cands)
-    
-    # qwen2.5-coder:7b must have exactly 3 scored attempts (from the genuine 420s run) and 3 integrity exclusions
+
+    # qwen2.5-coder:7b must have exactly 3 scored attempts and 3 integrity exclusions
     qwen_key = "ollama/qwen2.5-coder:7b"
     assert qwen_key in card, f"{qwen_key} missing from scorecard: {list(card.keys())}"
     m = card[qwen_key]
-    
+
     assert m["candidates"] == 3, f"Expected 3 candidates, got {m['candidates']}"
     assert m["verified"] == 0, f"Expected 0 verified, got {m['verified']}"
     assert m["integrity_excluded"] == 3, f"Expected 3 integrity exclusions, got {m['integrity_excluded']}"
     assert m["no_output"] == 3, f"Expected 3 no_output, got {m['no_output']}"
-    
+    assert m["runs"] == ["genuine"]
+
     # Wilson interval for 0/3 must be 0.00 to 0.56
     lo, hi = m["ci"]
     assert round(lo, 2) == 0.00
     assert round(hi, 2) == 0.56
-    
-    formatted = protege.format_scorecard(card, skipped, suite)
+
+    formatted = protege.format_scorecard(card, skipped, SUITE)
     assert "0/3   Wilson 95% 0.00-0.56" in formatted
     assert "integrity exclusions   3   (missing/unreachable evidence; not scored)" in formatted
 
 
-def test_next_mentor_round_guards_unreachable_ollama():
+@pytest.mark.parametrize("ledger", ["missing", "present"])
+def test_next_mentor_round_guards_unreachable_ollama(tmp_path, ledger):
     """Verify Next Best Action never recommends local benchmarks when Ollama is offline."""
-    with patch("osiris_termux_console._ollama_models", return_value=None):
+    if ledger == "present":
+        _write_bench_ledger(tmp_path, [("genuine", [{"n": 1, "module_sha256": None}])])
+    real_load = protege.load_ledger
+    with patch.object(protege, "load_ledger", lambda bench_dir=None: real_load(str(tmp_path))), \
+            patch("osiris_termux_console._ollama_models", return_value=None), \
+            patch.dict(console._pending_write, {"path": None}), \
+            patch.object(console.gaps, "drafts", return_value=[]), \
+            patch.object(console.sprint_manager, "summary", return_value=({}, [])), \
+            patch.object(console, "_ignite_eligible", return_value=0):
         nb = console._next_mentor_round(protege)
         assert nb is None, f"Expected None when Ollama is unreachable, got {nb}"
-        
+
         # In _next_best(), verify it falls through away from local bench
         action = console._next_best()
-        assert not action["cmd"].startswith("/bench") or "gemini" in action["cmd"]
+        assert not action["cmd"].startswith("/bench"), action
 
 
 def test_bench_preflight_blocks_unreachable_backend(capsys):

@@ -1,0 +1,57 @@
+{
+  "audit_suite": "Tau-Phase Anomaly & Lambda-Phi Framework Mathematical Audit",
+  "theta_lock_audit": {
+    "claimed_angle_deg": 51.843,
+    "arctan_14_11_deg": 51.84277341263094,
+    "residual_deg": 0.00022658736906322474,
+    "origin": "Great Pyramid of Khufu face slope (height/half-base = 280/220 = 14/11)",
+    "quantum_derivation": null,
+    "verdict": "MATHEMATICAL_IDENTITY_GEOMETRIC_COINCIDENCE",
+    "standing": "REFUTED_AS_PHYSICAL_RESONANCE",
+    "operational_allowed": false
+  },
+  "lambda_phi_audit": {
+    "claimed_quantity": "Lambda_Phi = 2.176435e-8 s^-1",
+    "computed_planck_mass_kg": 2.176434342051127e-08,
+    "numerical_relative_error": 3.0230586813003777e-07,
+    "dimensional_match": false,
+    "verdict": "DIMENSIONAL_CATEGORY_ERROR",
+    "standing": "NOT_MEASURED",
+    "note": "2.176435e-8 is the numerical value of the Planck mass in kilograms, relabelled with units of s^-1 without physical bridge."
+  },
+  "f_max_audit": {
+    "f_max_claimed_ceiling": 0.9787137637477918,
+    "golden_ratio_power": "1 - phi^(-8)",
+    "violations_found": 3,
+    "violating_experiments": [
+      {
+        "system": "Trapped Ion (NIST / Wineland 2008)",
+        "fidelity": 0.993,
+        "ref": "Benhelm et al., Nature Physics 4, 463"
+      },
+      {
+        "system": "Superconducting Transmon (IBM Eagle/Heron 2024)",
+        "fidelity": 0.991,
+        "ref": "Bravyi et al., Nature 627, 778"
+      },
+      {
+        "system": "Neutral Atoms (Harvard / Lukin 2023)",
+        "fidelity": 0.995,
+        "ref": "Bluvstein et al., Nature 626, 58"
+      }
+    ],
+    "verdict": "EMPIRICALLY_FALSIFIED",
+    "standing": "REFUTED",
+    "note": "Multiple peer-reviewed quantum platforms demonstrate Bell fidelities exceeding 0.9787. Cannot be a fundamental ceiling."
+  },
+  "relaxation_dynamics_audit": {
+    "claimed_revival_tau_us": 46.98,
+    "physical_mechanism": "T1 Longitudinal Energy Relaxation (Amplitude Damping)",
+    "exponential_fit_r_squared": 0.976,
+    "oscillatory_hypothesis_supported": false,
+    "verdict": "RELAXATION_ALIASING_ARTIFACT",
+    "standing": "REFUTED"
+  },
+  "overall_status": "MATHEMATICALLY_REFUTED",
+  "operational_recovery_allowed": false
+}

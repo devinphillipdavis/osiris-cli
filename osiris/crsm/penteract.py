@@ -21,13 +21,11 @@ import time
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from .swarm_orchestrator import (
     CRSMState,
     THETA_LOCK_DEG,
-    PHI_THRESHOLD,
-    GAMMA_CRITICAL,
     LAMBDA_PHI_M,
     CHI_PC_QUALITY,
     ZENO_FREQUENCY_HZ,

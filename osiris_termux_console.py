@@ -1613,7 +1613,7 @@ def _next_best():
         pass
     try:
         import protege
-        if protege.load_ledger()[1]:
+        if protege.load_ledger()[1] and _ollama_models() is not None:
             return dict(label=f"Benchmark {BENCH_DEFAULT_MODEL} on 3 tasks", cmd="/bench",
                         why="no model has been measured yet, so no model advice is possible",
                         will="3 local tasks, 1 attempt each, scored by hidden tests (minutes on a phone)",

@@ -5,7 +5,7 @@ Zero Trust Verification
 Zero-trust security verification for OSIRIS subsystems.
 """
 
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List
 from datetime import datetime
 
 

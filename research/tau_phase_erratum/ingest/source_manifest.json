@@ -1,0 +1,40 @@
+{
+  "source_document": "source_document.txt",
+  "title": "OSIRIS Tau-Phase Anomaly & Lambda-Phi Framework Specification",
+  "historical_date": "2025-12-08",
+  "sha256": "16dcc394f3e6cd3c68c11b6cc71097d7e23933016e0ac7c0c0ecb8a51694cbf8",
+  "byte_size": 1729,
+  "ingestion_timestamp_utc": "2026-10-27T03:05:25Z",
+  "ontological_firewall": {
+    "raw_claims_preserved": true,
+    "osiris_evaluation_isolated": true,
+    "historical_status": "PROVISIONAL_PRE_REGISTRATION_SUPERSEDED_BY_ERRATUM_V4_2_0"
+  },
+  "raw_claims": [
+    {
+      "claim_id": "TAU-CLAIM-001",
+      "statement": "Bell-state fidelity revival occurs at tau_0 = phi^8 * 1 us = 46.98 us",
+      "claimed_type": "physical_oscillation_revival"
+    },
+    {
+      "claim_id": "TAU-CLAIM-002",
+      "statement": "theta_lock = 51.843 degrees is an operational resonance and recovery angle",
+      "claimed_type": "torsion_resonance_gate"
+    },
+    {
+      "claim_id": "TAU-CLAIM-003",
+      "statement": "F_max = 1 - phi^(-8) ~ 0.9787 is a fundamental upper bound on Bell state fidelity",
+      "claimed_type": "universal_fidelity_ceiling"
+    },
+    {
+      "claim_id": "TAU-CLAIM-004",
+      "statement": "Lambda_Phi = 2.176435e-8 s^-1 is a universal quantum memory constant",
+      "claimed_type": "universal_physical_constant"
+    },
+    {
+      "claim_id": "TAU-CLAIM-005",
+      "statement": "Heron processors exhibit a 136-bit negentropy gap and 0.99999 error suppression",
+      "claimed_type": "macroscopic_quantum_enhancement"
+    }
+  ]
+}

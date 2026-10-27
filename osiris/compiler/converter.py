@@ -16,10 +16,9 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 from .dna_ir import (
     IRCompiler, IROptimizer, QuantumCircuitIR, IROperation, IROpType,
-    QuantumRegister, ClassicalRegister,
 )
 from .dna_parser import Lexer, Parser
-from .dna_runtime import ExecutionResult, RuntimeConfig
+from .dna_runtime import ExecutionResult
 from .backends.registry import BackendRegistry
 
 
