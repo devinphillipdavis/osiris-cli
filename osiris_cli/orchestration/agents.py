@@ -13,8 +13,6 @@ Implements distinct logical roles using the Gemma-native provider substrate:
 
 from __future__ import annotations
 
-import hashlib
-import json
 import os
 import time
 import uuid
@@ -232,24 +230,16 @@ class ResearchAgent:
 
 
 class MemoryLineageAgent:
-    """Maintains immutable, hash-chained ledger entries of verified proposals and runs."""
+    """Records verified proposals and runs in the genome ledger through GenomeLedger.append, so
+    they share its entry format ({prev, ts, kind, payload, hash}) and its locks with /apply and
+    sprint runs, and the chain stays verifiable."""
 
     def __init__(self, ledger_file: Optional[str] = None):
         self.ledger_file = ledger_file or os.path.expanduser("~/.osiris/genome_ledger.jsonl")
 
     def record_event(self, event_type: str, payload: Dict[str, Any]) -> str:
-        """Append event to hash-chained JSONL ledger."""
-        from osiris_cli import chain_lock
+        """Append one entry and return its hash. Raises, writing nothing, if the ledger cannot be
+        appended to (dnalang-core's ledger.py not found, or an unreadable tail)."""
+        import genome_ledger
 
-        def build(last):
-            entry_body = {
-                "event_type": event_type,
-                "timestamp": time.time(),
-                "payload": payload,
-                "prev_hash": last["hash"] if last else "0" * 64,
-            }
-            canonical_str = json.dumps(entry_body, sort_keys=True)
-            entry_body["hash"] = hashlib.sha256(canonical_str.encode("utf-8")).hexdigest()
-            return entry_body
-
-        return chain_lock.append_chained(self.ledger_file, build)["hash"]
+        return genome_ledger.GenomeLedger(self.ledger_file).append(event_type, payload)["hash"]
