@@ -70,8 +70,24 @@ def get_active_provider(force_name: Optional[str] = None, **kwargs) -> BaseModel
         _ACTIVE_PROVIDER = create_provider(env_provider, **kwargs)
         return _ACTIVE_PROVIDER
 
-    # Prioritize Gemma as the first-class inference substrate
+    # 1. Gemma if configured or live local endpoint
     gemma = GemmaProvider(**kwargs)
+    if gemma.mode == "endpoint" and gemma.health().available:
+        _ACTIVE_PROVIDER = gemma
+        return _ACTIVE_PROVIDER
+
+    # 2. Gemini if configured
+    try:
+        import gemini_bridge
+        if gemini_bridge.is_configured():
+            gemini = GeminiCompatibilityProvider(**kwargs)
+            if gemini.health().available:
+                _ACTIVE_PROVIDER = gemini
+                return _ACTIVE_PROVIDER
+    except Exception:
+        pass
+
+    # 3. Default to Gemma (local or mock)
     _ACTIVE_PROVIDER = gemma
     return _ACTIVE_PROVIDER
 

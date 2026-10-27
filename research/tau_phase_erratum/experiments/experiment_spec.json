@@ -1,0 +1,48 @@
+{
+  "framework": "OSIRIS Pre-Registration & Falsification Engine",
+  "governance": "SYS-022 / SYS-023 / SYS-024",
+  "organism_id": "tau_phase_erratum_study",
+  "provenance_standards": {
+    "selftest_doi": "10.5281/zenodo.18781261",
+    "erratum_doi": "10.5281/zenodo.23213023",
+    "controlled_job_reference": "ibm_fez (job dannuhgpqrnc73991ntg)"
+  },
+  "experiments": [
+    {
+      "experiment_id": "EXP-TAU-01",
+      "title": "Controlled RZ(theta) Rotation Angle Sweep against Sign-Flipped & Random Controls",
+      "target_claim": "TAU-CLAIM-002 (theta_lock = 51.843 deg)",
+      "hypothesis": "H1: Applying RZ(51.843 deg) provides a statistically significant enhancement in GHZ fidelity relative to random and sign-flipped controls.",
+      "null_hypothesis": "H0: Applying RZ(51.843 deg) produces a fidelity change indistinguishable from random controls (delta_F = 0).",
+      "baseline": "Uncorrected GHZ state fidelity on ibm_fez (12 trials).",
+      "expected_observable": "Differential fidelity delta_F = F(theta) - F_baseline.",
+      "measurement_uncertainty": {
+        "target_sigma": 0.006,
+        "trials_per_condition": 12
+      },
+      "controls": {
+        "sign_flipped_control": "RZ(-51.843 deg)",
+        "random_angle_control": "RZ(theta_random), theta ~ Uniform(0, 2*pi)"
+      },
+      "falsification_criterion": "If |delta_F(51.843) - delta_F(random)| <= 3.0 * sigma (p > 0.05), H1 is formally REFUTED."
+    },
+    {
+      "experiment_id": "EXP-TAU-02",
+      "title": "K8 Idle Delay Decay Curve Fitting (Exponential vs Oscillatory)",
+      "target_claim": "TAU-CLAIM-001 (tau_0 = 46.98 us revival)",
+      "hypothesis": "H1: Bell state fidelity exhibits a secondary revival peak at delay tau ~ 47 us.",
+      "null_hypothesis": "H0: Bell state fidelity follows pure monotonic T1/T2 exponential amplitude and phase damping.",
+      "baseline": "Standard Lindblad master equation exponential relaxation.",
+      "expected_observable": "Coefficient of determination R^2 of pure exponential fit vs sinusoidal revival fit.",
+      "measurement_uncertainty": {
+        "time_resolution_us": 1.0,
+        "delay_range_us": [0.0, 100.0]
+      },
+      "controls": {
+        "negative_control": "Zero-delay Bell state (t = 0).",
+        "positive_control": "Dynamically decoupled Bell state (XY4 sequence)."
+      },
+      "falsification_criterion": "If pure exponential fit yields R^2 >= 0.95 with no statistically significant Fourier peak at 47 us, H1 is formally REFUTED."
+    }
+  ]
+}

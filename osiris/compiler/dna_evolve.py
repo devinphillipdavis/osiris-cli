@@ -3,12 +3,11 @@ DNA-Lang Evolutionary Optimization Engine — DARWINIAN-LOOP.
 """
 
 import random
-import hashlib
-from typing import Any, Dict, List, Optional, Callable
+from typing import Dict, List, Optional
 from dataclasses import dataclass, field
 from copy import deepcopy
 
-from .dna_ir import QuantumCircuitIR, IROperation, IROpType, QuantumRegister, ClassicalRegister
+from .dna_ir import QuantumCircuitIR, IROpType
 
 LAMBDA_PHI = 2.176435e-8
 DEFAULT_POPULATION_SIZE = 8

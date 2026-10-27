@@ -25,7 +25,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional, List, Dict
 
-from .autograd import Tensor, cross_entropy_loss, clip_grad_norm
+from .autograd import cross_entropy_loss, clip_grad_norm
 from .transformer import SovereignTransformer, SovereignConfig
 from .optimizer import AdamW, LRSchedule
 

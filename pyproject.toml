@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "osiris-cli"
-version = "4.5.4"
+version = "4.6.0"
 description = "OSIRIS: a governed local console for a living language model that learns from every conversation and speaks only after passing a held-out gate"
 readme = "README.md"
 license = {text = "LicenseRef-OSIRIS-Dual-v1.0"}
@@ -188,6 +188,10 @@ line-length = 100
 [tool.ruff.lint]
 select = ["E", "F", "W", "I"]
 ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+# Package __init__ files re-export submodules, sometimes after constants or by `*`.
+"__init__.py" = ["F401", "E402", "F403"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -1,0 +1,29 @@
+================================================================================
+DOCUMENT: OSIRIS Tau-Phase Anomaly & Lambda-Phi Framework Specification
+ORIGINAL DATE: 2025-12-08 (Updated Pre-Registration 2026-01-15)
+SOURCE ARCHIVES: Zenodo 10.5281/zenodo.17858632, 10.5281/zenodo.17859207
+STATUS: HISTORICAL SPECULATIVE PRE-REGISTRATION (Subject to Erratum v4.2.0)
+================================================================================
+
+EXECUTIVE CLAIMS SUMMARY:
+1. Tau-Phase Temporal Modulation:
+   A purported coherent Bell-state fidelity revival observed at tau_0 = 46.0 - 46.98 microseconds
+   on IBM Quantum superconducting processors (ibm_fez, ibm_torino), modeled as:
+     tau_0 = phi^8 * 1 microsecond = 46.9787 microseconds (where phi is the golden ratio).
+
+2. Torsion Lock Angle (theta_lock):
+   An angular recovery resonance claimed at theta_lock = 51.843 degrees (arctan(14/11)),
+   purportedly acting as an operational phase-conjugate recovery gate in Cl(3,0) Clifford space.
+
+3. Maximum Fidelity Ceiling (F_max):
+   A theoretical upper bound on two-qubit Bell fidelity claimed as:
+     F_max = 1 - phi^(-8) = 1 - 0.021286 = 0.978714.
+
+4. Universal Memory Invariant (Lambda_Phi):
+   A claimed fundamental rate constant Lambda_Phi = 2.176435e-8 s^-1 governing
+   negentropic quantum state persistence and proof-of-coherence.
+
+5. Negentropy Gap:
+   A claimed 136-bit negentropy gap and five-nines (0.99999) error suppression on
+   Heron-class quantum processors.
+================================================================================

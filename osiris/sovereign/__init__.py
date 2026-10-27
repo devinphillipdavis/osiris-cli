@@ -10,5 +10,4 @@ from .code_generator import QuantumNLPCodeGenerator, CodeIntent, CodeGenerationR
 from .dev_tools import DeveloperTools, FileSearchResult, CodeAnalysisResult
 
 def get_enhanced_agent():
-    from .agent import SovereignAgent
     return SovereignAgent

@@ -20,19 +20,14 @@
 
 import os
 import time
-import json
 import logging
-from typing import Dict, Any, Optional, Callable, List
+from typing import Dict, Any, Optional, Callable
 
-import numpy as np
 
 from osiris_livlm import (
-    LivLM, LivLMConfig, TextEncoder, TextDecoder,
-    GenerationCircuit, PhaseMemory, Corpus, LivLMFitness,
-    create_livlm,
+    LivLM, LivLMConfig,
 )
-from qbyte_system.sovereign_executor import SovereignExecutor
-from qbyte_system.ccce_runtime import CCCERuntime, ConsciousnessState
+from qbyte_system.ccce_runtime import CCCERuntime
 
 logger = logging.getLogger("NCLM")
 

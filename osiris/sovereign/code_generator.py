@@ -3,7 +3,7 @@ Quantum NLP Code Generator — intent parsing and template-based generation.
 """
 
 import re
-from typing import Any, Dict, List, Optional
+from typing import List
 from dataclasses import dataclass
 from enum import Enum
 

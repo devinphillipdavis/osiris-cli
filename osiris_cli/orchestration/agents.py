@@ -13,8 +13,6 @@ Implements distinct logical roles using the Gemma-native provider substrate:
 
 from __future__ import annotations
 
-import hashlib
-import json
 import os
 import time
 import uuid
@@ -232,37 +230,16 @@ class ResearchAgent:
 
 
 class MemoryLineageAgent:
-    """Maintains immutable, hash-chained ledger entries of verified proposals and runs."""
+    """Records verified proposals and runs in the genome ledger through GenomeLedger.append, so
+    they share its entry format ({prev, ts, kind, payload, hash}) and its locks with /apply and
+    sprint runs, and the chain stays verifiable."""
 
     def __init__(self, ledger_file: Optional[str] = None):
         self.ledger_file = ledger_file or os.path.expanduser("~/.osiris/genome_ledger.jsonl")
 
     def record_event(self, event_type: str, payload: Dict[str, Any]) -> str:
-        """Append event to hash-chained JSONL ledger."""
-        os.makedirs(os.path.dirname(self.ledger_file), exist_ok=True)
-        prev_hash = "0" * 64
+        """Append one entry and return its hash. Raises, writing nothing, if the ledger cannot be
+        appended to (dnalang-core's ledger.py not found, or an unreadable tail)."""
+        import genome_ledger
 
-        if os.path.exists(self.ledger_file):
-            try:
-                with open(self.ledger_file, "r", encoding="utf-8") as f:
-                    lines = [ln.strip() for ln in f if ln.strip()]
-                    if lines:
-                        last_entry = json.loads(lines[-1])
-                        prev_hash = last_entry.get("hash", prev_hash)
-            except Exception:
-                pass
-
-        entry_body = {
-            "event_type": event_type,
-            "timestamp": time.time(),
-            "payload": payload,
-            "prev_hash": prev_hash,
-        }
-        canonical_str = json.dumps(entry_body, sort_keys=True)
-        curr_hash = hashlib.sha256(canonical_str.encode("utf-8")).hexdigest()
-        entry_body["hash"] = curr_hash
-
-        with open(self.ledger_file, "a", encoding="utf-8") as f:
-            f.write(json.dumps(entry_body) + "\n")
-
-        return curr_hash
+        return genome_ledger.GenomeLedger(self.ledger_file).append(event_type, payload)["hash"]

@@ -7,7 +7,7 @@ import os
 import re
 import tempfile
 from pathlib import Path
-from typing import Iterable, List, Optional, Tuple
+from typing import List, Tuple
 
 
 class WorkspaceError(ValueError):

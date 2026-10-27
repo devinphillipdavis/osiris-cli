@@ -10,7 +10,6 @@ from typing import Callable, Dict, Any, List, Optional
 import random
 
 from .organism import Organism
-from .genome import Genome
 
 
 class EvolutionEngine:

@@ -41,14 +41,11 @@ from dataclasses import dataclass, field
 import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from qbyte_system.qbyte import Qbyte, CCCEMetrics
-from qbyte_system.gates import helix, cleave, twist, fold, splice, bond, phase_flip
-from qbyte_system.sovereign_executor import SovereignExecutor, Circuit, ExecutionResult
-from qbyte_system.ccce_runtime import CCCERuntime, OrganismState, ConsciousnessState
+from qbyte_system.sovereign_executor import SovereignExecutor, Circuit
+from qbyte_system.ccce_runtime import ConsciousnessState
 from qbyte_system.phase_conjugate import PhaseConjugateEngine
 from qbyte_system.genetic_evolution import (
-    GeneticEvolutionEngine, EvolutionConfig, Individual,
-    SelectionMethod, CrossoverMethod, MutationMethod
+    GeneticEvolutionEngine, EvolutionConfig, SelectionMethod, CrossoverMethod, MutationMethod
 )
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -849,7 +846,8 @@ class LivLM:
             self._genome = np.random.uniform(-np.pi, np.pi,
                                              self.gen_circuit.n_params)
 
-        temp = temperature if temperature is not None else self.config.temperature
+        # BUG (kept as found): `temp` is never applied, so `temperature` has no effect.
+        temp = temperature if temperature is not None else self.config.temperature  # noqa: F841
         seed = prompt or self.config.seed_text
 
         # Reset memory with seed

@@ -76,11 +76,16 @@ def _load_dotenv():
 
 _load_dotenv()
 
-OLLAMA_GEN_URL = "http://localhost:11434/api/generate"
+try:
+    from osiris_cli.providers.ollama_compat import ollama_base_url
+    OLLAMA_GEN_URL = ollama_base_url() + "/api/generate"
+except ImportError:
+    OLLAMA_GEN_URL = "http://localhost:11434/api/generate"
 CHAT_MODEL = os.environ.get("OSIRIS_CHAT_MODEL", "gemma-3-1b")
 CODE_MODEL = os.environ.get("OSIRIS_CODE_MODEL", "gemma-3-1b")
 
 ARCHITECT_PREFERENCES = (
+    "gemma2:2b",
     "gemma-3-1b",
     "gemma-3-4b",
     "gemma-3-270m",
@@ -97,10 +102,12 @@ ARCHITECT_PREFERENCES = (
 )
 
 SYNTHESIZER_PREFERENCES = (
+    "gemma2:2b",
     "gemma-3-1b",
     "gemma-3-4b",
     "gemma-2-2b",
     "gemma3:1b",
+    "gemma:2b",
     "qwen2.5-coder:7b",
     "deepseek-coder",
     "qwen2.5:7b",
@@ -174,6 +181,9 @@ ORGANISM_MAX_BACKUPS = 5
 OLLAMA_STARTUP_TIMEOUT = 2.5
 _organism_lock = threading.Lock()
 _organism_state = {"model": None, "optimizer": None, "step": 0, "history": []}
+# Set by the REPL to its power governor's unattended check: () -> (allowed, reason).
+# Engine 3's background step is unattended work, so it is skipped when this refuses.
+UNATTENDED_POWER_GATE = None
 # Guards actual terminal output, not model state (_organism_lock's job). Engine
 # 3's background thread prints its own step/drift/failure lines at unpredictable
 # times relative to the main thread's live token streaming in query_model() --
@@ -1603,7 +1613,7 @@ def _next_best():
         pass
     try:
         import protege
-        if protege.load_ledger()[1]:
+        if protege.load_ledger()[1] and _ollama_models() is not None:
             return dict(label=f"Benchmark {BENCH_DEFAULT_MODEL} on 3 tasks", cmd="/bench",
                         why="no model has been measured yet, so no model advice is possible",
                         will="3 local tasks, 1 attempt each, scored by hidden tests (minutes on a phone)",
@@ -3813,7 +3823,24 @@ def _organism_alerts(n=10):
 def _spawn_organism_learn(text: str):
     if not text or not text.strip():
         return
-    threading.Thread(target=_organism_learn, args=(text,), daemon=True).start()
+    threading.Thread(target=_organism_learn_if_powered, args=(text,), daemon=True).start()
+
+
+def _organism_learn_if_powered(text: str):
+    gate = UNATTENDED_POWER_GATE
+    if gate is not None:
+        try:
+            allowed, reason = gate()
+        except Exception as e:  # a broken gate refuses, it never waves work through
+            allowed, reason = False, f"power gate error: {e}"
+        if not allowed:
+            if not _organism_state.get("power_skip_shown"):
+                _organism_state["power_skip_shown"] = True
+                with _stdout_lock:
+                    print(f"\n[Organism] background update skipped: {reason}")
+            _organism_telemetry(f"SKIP reason={reason} exchange_len={len(text)} [PROVENANCE: COMPUTED]")
+            return
+    _organism_learn(text)
 
 
 def _format_age(mtime_epoch):

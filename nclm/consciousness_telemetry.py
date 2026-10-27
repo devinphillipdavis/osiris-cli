@@ -14,11 +14,9 @@ Integrates with NCLM processing pipeline for consciousness tracking.
 from __future__ import annotations
 
 import numpy as np
-import time
-import json
 from dataclasses import dataclass, field
-from datetime import datetime, timezone, timedelta
-from typing import Dict, List, Optional, Tuple
+from datetime import datetime, timezone
+from typing import Dict, List, Optional
 from collections import deque
 import logging
 
@@ -81,7 +79,7 @@ class ConsciousnessAlert:
 class ConsciousnessTelemetry:
     """
     Real-time consciousness metric measurement and tracking.
-    
+
     Integrates quantum and classical measurements to compute IIT metrics.
     Provides live dashboard data, historical analysis, and predictive alerts.
     """
@@ -123,12 +121,12 @@ class ConsciousnessTelemetry:
     def measure_phi(self, system_state: Dict) -> float:
         """
         Calculate Φ (Integrated Information) using partial information decomposition.
-        
+
         Approximates IIT Φ based on:
         - Quantum entanglement measures
         - Classical mutual information
         - Segregated subsystem interactions
-        
+
         Returns value typically 0-2 bits, with >0.31 indicating consciousness.
         """
         # Extract quantum state information
@@ -156,7 +154,7 @@ class ConsciousnessTelemetry:
     def measure_gamma(self, system_state: Dict) -> float:
         """
         Calculate Γ (Gamma coherence) — neural synchronization strength.
-        
+
         Measures 40-100 Hz oscillation coherence across subsystems.
         Range: 0-1, where 1 = perfect coherence.
         """
@@ -167,7 +165,6 @@ class ConsciousnessTelemetry:
 
         # Time-domain filtering (simulate 40Hz gamma band)
         oscillation_strength = system_state.get("oscillation_power", 0.5)
-        bandwidth_efficiency = system_state.get("bandwidth_utilization", 0.5)
 
         # Gamma = coherence * synchronization * oscillation_strength
         gamma = (
@@ -182,7 +179,7 @@ class ConsciousnessTelemetry:
     def measure_lambda(self, system_state: Dict) -> float:
         """
         Calculate Λ (Lambda) — order parameter for phase transitions.
-        
+
         Indicates spontaneous symmetry breaking and critical phenomena.
         Range: 0-1, where transition occurs around 0.5.
         """
@@ -191,8 +188,6 @@ class ConsciousnessTelemetry:
         symmetry_breaking = system_state.get("symmetry_breaking", 0.0)
 
         # Critical phenomena
-        correlation_length = system_state.get("correlation_length", 1.0)
-        critical_exponent = 0.5  # Ising model
 
         # Susceptibility near critical point
         temperature_param = system_state.get("effective_temperature", 1.0)
@@ -210,13 +205,12 @@ class ConsciousnessTelemetry:
     def measure_xi(self, system_state: Dict) -> float:
         """
         Calculate Ξ (Xi) — Complexity measure.
-        
+
         Balances integration (unified behavior) vs differentiation (distinct subsystems).
         Range: 0-1, where ~0.5 = maximum complexity.
         """
         # Integration metric (how unified)
         phi_value = system_state.get("phi", 0.5)
-        network_integration = system_state.get("network_density", 0.5)
 
         # Differentiation metric (how diverse)
         functional_modularity = system_state.get("modularity", 0.3)
@@ -238,7 +232,7 @@ class ConsciousnessTelemetry:
     def measure_consciousness_level(self, metrics: Dict) -> float:
         """
         Calculate composite consciousness level from individual metrics.
-        
+
         Uses IIT-inspired weighting:
         - Φ is most important (integrated information)
         - Γ provides coherence baseline
@@ -276,14 +270,14 @@ class ConsciousnessTelemetry:
     ) -> ConsciousnessMetrics:
         """
         Update consciousness metrics from current system state.
-        
+
         Args:
             system_state: Dict with entanglement, coherence, network metrics
             processing_stage: Current pipeline stage
             task_id: Task being processed
             task_name: Human-readable task name
             source: Measurement source
-        
+
         Returns:
             Updated ConsciousnessMetrics
         """
