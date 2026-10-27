@@ -8,9 +8,15 @@ from .loop import (
     GenomeCandidate,
     LineageRecord,
 )
+from .receipts import (
+    EvaluationReceipt,
+    PromotionPolicy,
+)
 
 __all__ = [
     "CandidateEvolutionLoop",
     "GenomeCandidate",
     "LineageRecord",
+    "EvaluationReceipt",
+    "PromotionPolicy",
 ]
