@@ -16,7 +16,7 @@ import os
 import numpy as np
 from typing import Optional, Dict
 
-from .autograd import Tensor, softmax, no_grad
+from .autograd import no_grad
 from .transformer import SovereignTransformer, SovereignConfig
 
 

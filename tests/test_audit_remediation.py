@@ -1,0 +1,172 @@
+"""
+Unit test suite verifying remediation of Node Alpha audit findings:
+1. Mentor round reachability preflight & scorecard integrity exclusions (no infrastructure failures scored as model fails).
+2. NBA (Next Best Action) reachability guard preventing recommendations of unreachable backends.
+3. Claims Firewall compliance on /mesh (SYS-024).
+4. PowerGovernor sensor outage (fail-closed when unattended) and ledger event logging.
+5. runpy RuntimeWarning elimination via lazy loading.
+6. Organism baseline dual-reporting (nats and bpb vs unigram baseline).
+"""
+
+import io
+import json
+import os
+import subprocess
+import sys
+from unittest.mock import MagicMock, patch
+import pytest
+
+import protege
+import osiris_termux_console as console
+from osiris_cli.osiris_repl import SESSION, PowerGovernor, execute_mesh
+
+
+SUITE, RUNNER = "s" * 64, "r" * 64
+MENTOR = {"backend": "ollama", "model": "qwen2.5-coder:7b"}
+
+
+def _write_bench_ledger(bench_dir, runs):
+    """A hash-chained results ledger (protege.load_ledger's rule): one
+    bench_run_start and one bench_task per (task, row) for each run."""
+    entries, prev = [], protege.GENESIS
+    for run_id, rows in runs:
+        bodies = [dict(kind="bench_run_start", run_id=run_id, suite_sha256=SUITE,
+                       runner_sha256=RUNNER, **MENTOR)]
+        bodies += [dict(kind="bench_task", run_id=run_id, task=f"t{i}", result={"attempts": [row]})
+                   for i, row in enumerate(rows)]
+        for body in bodies:
+            h = protege.hashlib.sha256((prev + protege._canon(body)).encode()).hexdigest()
+            entries.append(dict(body, prev=prev, hash=h))
+            prev = h
+    bench_dir.mkdir(parents=True, exist_ok=True)
+    with open(bench_dir / "results.ledger.jsonl", "w", encoding="utf-8") as f:
+        f.write("".join(json.dumps(e) + "\n" for e in entries))
+
+
+def test_scorecard_integrity_exclusions_and_quarantine(tmp_path):
+    """Verify that 0.0s unreachable rounds and quarantined runs are excluded from capability scores."""
+    no_output = {"n": 1, "own_ok": False, "hidden_ok": False, "module_sha256": None}
+    _write_bench_ledger(tmp_path, [
+        ("genuine", [no_output] * 3),                                   # scored: 3 verified fails
+        ("dropped", [dict(no_output, hidden_reason="<urlopen error [Errno 111] Connection refused>"),
+                     dict(no_output, unreachable=True)]),              # infrastructure, not the model
+        ("quarantined", [no_output]),                                   # registered quarantine
+    ])
+    (tmp_path / "quarantine.json").write_text(json.dumps({"quarantined_runs": {"quarantined": "0.0s"}}))
+
+    entries, problem = protege.load_ledger(str(tmp_path))
+    assert not problem, f"Ledger error: {problem}"
+
+    cands, skipped = protege.candidates(entries, SUITE, RUNNER, bench_dir=str(tmp_path))
+    card = protege.scorecard(cands)
+
+    # qwen2.5-coder:7b must have exactly 3 scored attempts and 3 integrity exclusions
+    qwen_key = "ollama/qwen2.5-coder:7b"
+    assert qwen_key in card, f"{qwen_key} missing from scorecard: {list(card.keys())}"
+    m = card[qwen_key]
+
+    assert m["candidates"] == 3, f"Expected 3 candidates, got {m['candidates']}"
+    assert m["verified"] == 0, f"Expected 0 verified, got {m['verified']}"
+    assert m["integrity_excluded"] == 3, f"Expected 3 integrity exclusions, got {m['integrity_excluded']}"
+    assert m["no_output"] == 3, f"Expected 3 no_output, got {m['no_output']}"
+    assert m["runs"] == ["genuine"]
+
+    # Wilson interval for 0/3 must be 0.00 to 0.56
+    lo, hi = m["ci"]
+    assert round(lo, 2) == 0.00
+    assert round(hi, 2) == 0.56
+
+    formatted = protege.format_scorecard(card, skipped, SUITE)
+    assert "0/3   Wilson 95% 0.00-0.56" in formatted
+    assert "integrity exclusions   3   (missing/unreachable evidence; not scored)" in formatted
+
+
+@pytest.mark.parametrize("ledger", ["missing", "present"])
+def test_next_mentor_round_guards_unreachable_ollama(tmp_path, ledger):
+    """Verify Next Best Action never recommends local benchmarks when Ollama is offline."""
+    if ledger == "present":
+        _write_bench_ledger(tmp_path, [("genuine", [{"n": 1, "module_sha256": None}])])
+    real_load = protege.load_ledger
+    with patch.object(protege, "load_ledger", lambda bench_dir=None: real_load(str(tmp_path))), \
+            patch("osiris_termux_console._ollama_models", return_value=None), \
+            patch.dict(console._pending_write, {"path": None}), \
+            patch.object(console.gaps, "drafts", return_value=[]), \
+            patch.object(console.sprint_manager, "summary", return_value=({}, [])), \
+            patch.object(console, "_ignite_eligible", return_value=0):
+        nb = console._next_mentor_round(protege)
+        assert nb is None, f"Expected None when Ollama is unreachable, got {nb}"
+
+        # In _next_best(), verify it falls through away from local bench
+        action = console._next_best()
+        assert not action["cmd"].startswith("/bench"), action
+
+
+def test_bench_preflight_blocks_unreachable_backend(capsys):
+    """Verify _bench and _bench_preflight fail-closed if Ollama is unreachable."""
+    with patch("osiris_termux_console._ollama_models", return_value=None):
+        console._bench("/bench")
+        out = capsys.readouterr().out
+        assert "BACKEND UNREACHABLE" in out
+        assert "Ollama daemon is offline" in out
+        assert "Refusing" in out and "evidence ledger contamination" in out
+        
+        console._bench("/bench now")
+        out_now = capsys.readouterr().out
+        assert "BACKEND UNREACHABLE" in out_now
+
+
+def test_mesh_enforces_sys024_claims_firewall(capsys):
+    """Verify execute_mesh() labels 9-agent cognitive mesh under SYS-024 Claims Firewall."""
+    execute_mesh()
+    out = capsys.readouterr().out
+    assert "SYS-024" in out
+    assert "MODEL_PROPOSED / DELIBERATION ROLES" in out
+    assert "Simulation Persona Scaffold" in out
+    assert "Empirical verification required" in out
+
+
+def test_power_governor_sensor_outage_and_ledger_event():
+    """An unreadable sensor reports unknown readings, allows attended work, refuses unattended
+    work, and logs POWER_SENSOR_OUTAGE once to the evidence ledger."""
+    SESSION.evidence_ledger.clear()
+
+    with patch("subprocess.run", side_effect=Exception("Sensor offline")), \
+         patch.dict(os.environ, {"TERMUX_VERSION": "0.118.0"}):
+        gov = PowerGovernor()
+        gov._is_termux = True
+        dec = gov.check()
+        assert dec.allowed is True and dec.battery_pct is None and dec.temp_c is None
+        assert "unreadable" in dec.reason
+        assert gov.check(unattended=True).allowed is False
+
+        events = [e for e in SESSION.evidence_ledger if e["event_type"] == "POWER_SENSOR_OUTAGE"]
+        assert len(events) == 1
+        assert events[0]["details"]["mode"] == "FAIL_CLOSED_UNATTENDED"
+        assert "unreadable" in events[0]["details"]["reason"]
+
+
+def test_runpy_runtime_warning_eliminated():
+    """Verify running osiris_repl as module emits zero runpy RuntimeWarnings."""
+    cmd = [
+        sys.executable,
+        "-W", "error::RuntimeWarning",
+        "-m", "osiris_cli.osiris_repl",
+        "--help"
+    ]
+    res = subprocess.run(cmd, capture_output=True, text=True)
+    assert res.returncode == 0
+    assert "RuntimeWarning" not in res.stderr
+
+
+def test_organism_status_dual_baseline_reporting(capsys):
+    """Verify _organism_status reports mean loss in nats alongside unigram baseline comparison."""
+    with patch.dict(console._organism_state, {
+        "model": "dummy",
+        "step": 42,
+        "history": [6.2, 6.0, 5.8, 5.5, 5.3, 5.0, 4.8, 4.6, 4.4, 4.2]
+    }):
+        console._organism_status()
+        out = capsys.readouterr().out
+        assert "ORGANISM STATUS" in out
+        assert "nats" in out
+        assert "vs 5.08 unigram baseline" in out

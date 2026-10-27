@@ -26,477 +26,434 @@ You now have:
 **Start immediately:**
 ```bash
 python3 /workspaces/osiris-cli/quantum_discovery/phase1_analysis/phase1_executor.py --full-analysis
-|  OSIRIS >> IMPLEMENTATION SUMMARY v6.0                             |
-|  co-authored by devin phillip davis                                |
-|  and OSIRIS dna::}{::lang NCLM                                    |
-+====================================================================+
->>>>>>> a42d389e (Production enhancements, security audit, and documentation updates. No Apple or exfiltration code.\n\nCo-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>)
 ```
 
-# OSIRIS v6.0 -- Complete Chat-Driven Enhancement Summary
-
-## Mission Accomplished: Transforming OSIRIS into Intelligent Chat-First System
-
-This document summarizes the comprehensive enhancement of OSIRIS from a command-driven CLI into a fully intelligent, chat-first interface with autonomous capabilities.
+This will execute a full 4-week research analysis in ~3 minutes and produce:
+- `data_inventory.json` (all 1,430 circuits cataloged)
+- `entropy_analysis_results.json` (entropy metrics)  
+- `anomalies_week4.csv` (statistically significant outliers)
 
 ---
 
-## ✅ All 10 Requirements Fully Implemented
+## What Was Built
 
-### 1. **Chat-First Interface (No Command Syntax Required)** ✓
-   - **Module**: `chat_tui.py` + `orchestrator.py`
-   - **Implementation**:
-     - Pure natural language input (no `osiris create foo --bar` syntax)
-     - Rich terminal UI with persistent input field
-     - Chat history panel showing all interactions
-     - Free-form text, pasted data, or unstructured input accepted
-     - Auto-parsed into actionable intent
-   - **Files**: `chat_tui.py` (500 lines), `osiris_chat.py` (entry point)
-   - **Status**: ✓ Complete and tested
+A **complete automated scientific discovery pipeline** that:
 
-### 2. **Intent Deduction & Autonomous Advancement** ✓
-   - **Module**: `intent_processor.py` + `auto_advancement_engine.py`
-   - **Implementation**:
-     - NLP-based intent deduction (92%+ accuracy demonstrated)
-     - Automatic goal inference from context and history
-     - Progressive task refinement without explicit commands
-     - Autonomous step progression (INIT → ANALYSIS → PLANNING → EXECUTION → TESTING → COMPLETION)
-     - Learns from interaction history and adapts
-   - **Features**:
-     - 6-domain understanding (quantum, dev, ml, data, devops, research)
-     - Trajectory tracking (discovery/implementation/validation/optimization)
-     - Prerequisite validation for task sequencing
-     - Error recovery and alternative path suggestions
-   - **Files**: `intent_processor.py` (650 lines), `auto_advancement_engine.py` (400 lines)
-   - **Status**: ✓ Complete and validated
+### ✅ Core Capabilities
+- Executes quantum experiments on **real IBM Quantum hardware** (or mock for testing)
+- Applies **rigorous statistical validation** (p-values, effect sizes, confidence intervals)
+- **Automatically publishes** validated results to Zenodo with DOIs
+- Supports **null results** (publishes when hypothesis is disproven)
+- Maintains **full provenance** (job IDs, exact parameters, timestamps)
+- Enables **independent replication** by other researchers
 
-### 3. **Hotkey-Driven Action Layer** ✓
-   - **Module**: `hotkey_engine.py`
-   - **Implementation**:
-     - Dynamic hotkey generation (a, s, d, e, r, f, g, h keys)
-     - Context-aware action mapping
-     - Every response includes hotkey action list
-     - Adaptive based on goal, trajectory, and success probability
-     - Progressive complexity (basic → advanced options)
-   - **Features**:
-     - 8 maximum hotkeys per response screen
-     - Priority-based ordering (critical > primary > secondary > advanced)
-     - Success probability indicators (✓ = 70%+, ~ = 50-70%)
-     - Impact levels (○ low, ◎ medium, ● high)
-   - **Files**: `hotkey_engine.py` (400 lines)
-   - **Status**: ✓ Complete with visual indicators
-
-### 4. **Auto-Enhancement Engine** ✓
-   - **Module**: `orchestrator.py` (main) + all subsystems
-   - **Implementation**:
-     - Automatic output refinement and structuring
-     - Agent swarm continuously improves work quality
-     - Response synthesis and aggregation
-     - Intelligent suggestion generation
-   - **Features**:
-     - Polisher agents for code optimization
-     - Documentation auto-generation
-     - Performance improvement recommendations
-     - Quality metrics tracking
-   - **Status**: ✓ Built into agent swarm + mentor protocol
-
-### 5. **Universal Input Handling** ✓
-   - **Module**: `universal_input_processor.py`
-   - **Implementation**:
-     - Auto-detects 17 input types
-     - Parses code (Python, JS, Java, C++, SQL, etc.)
-     - Handles data (JSON, CSV, YAML)
-     - Error logs & stack traces
-     - Mixed/unstructured data
-   - **Features**:
-     - Confidence scoring (0-100%)
-     - Automatic language detection
-     - Structure analysis (depth, complexity, size)
-     - Error extraction and summarization
-   - **Files**: `universal_input_processor.py` (550 lines)
-     - Tested on 4+ input types in examples
-   - **Status**: ✓ Complete with 17 type support
-
-### 6. **Multi-Domain Intelligence (Beyond Quantum)** ✓
-   - **Domains Supported**:
-     - Quantum computing (circuits, operations, consciousness metrics)
-     - Software development (all languages, architectures)
-     - Machine learning (models, training, evaluation)
-     - Data analysis (processing, visualization, insights)
-     - DevOps (deployment, infrastructure, monitoring)
-     - Research (synthesis, discovery, knowledge graphs)
-     - Project management (agile, sprints, estimation)
-     - General problem-solving (any domain)
-   - **Implementation**: Domain tags in intent processor + specialist agents
-   - **Status**: ✓ 8 major domains, expandable
-
-### 7. **Agent Swarm Architecture** ✓
-   - **Module**: `agent_swarm.py`
-   - **Implementation**:
-     - 9 agent roles with distinct capabilities
-     - Parallel task execution (12 concurrent agents max)
-     - Autonomous work on assigned tasks
-     - Result synthesis and reporting
-   - **Agent Roles**:
-     1. **Developer**: Code implementation, refactoring (445 LOC example)
-     2. **Learner**: Research, synthesis (8 sources example)
-     3. **Polisher**: Optimization, documentation (4 optimizations example)
-     4. **Architect**: Design, structure planning
-     5. **Mentor**: Teaching, explanation
-     6. **Quantum Specialist**: Quantum-specific analysis
-     7. **ML Specialist**: Model design, training
-     8. **Data Specialist**: Data processing, analysis
-     9. **Tester**: Testing, validation (28 test cases example)
-   - **Features**:
-     - Async/await parallel execution
-     - Shared context pool
-     - Result aggregation & synthesis
-     - Success rate tracking
-   - **Files**: `agent_swarm.py` (550 lines)
-   - **Status**: ✓ Complete with 9 roles, tested
-
-### 8. **Agile Project Management Integration** ✓
-   - **Module**: `agile_orchestrator.py`
-   - **Implementation**:
-     - Automatic task decomposition (goal → 6+ subtasks)
-     - Sprint planning (14-day default cycles)
-     - Built-in story point estimation
-     - Backlog prioritization
-     - Velocity tracking & burndown
-     - Daily standup reports
-   - **Features**:
-     - Task status workflow (BACKLOG → READY → IN_PROGRESS → REVIEW → DONE)
-     - Blocker tracking and unblocking
-     - Retrospectives and learning
-     - Team metrics (velocity, cycle time, completion rate)
-   - **Files**: `agile_orchestrator.py` (450 lines)
-   - **Status**: ✓ Complete with sprint management
-
-### 9. **Mentor–Protégé Protocol** ✓
-   - **Module**: `mentor_protocol.py`
-   - **Implementation**:
-     - Dual-mode: Mentor (teaching) + Agent (execution)
-     - Capability level tracking (NOVICE → EXPERT)
-     - Difficulty-adjusted explanations
-     - Teachable moment identification
-     - Misconception correction
-   - **Features**:
-     - 6 capability levels with progressive content
-     - Learning path generation
-     - Performance-based level adaptation
-     - Mentor mode wrapped around actions
-     - Guidance included with executions
-   - **Teaching Approaches**:
-     - EXPLAIN: Clarify concepts
-     - GUIDE: Step through processes
-     - DEMONSTRATE: Show with examples
-     - SCAFFOLD: Provide structure
-     - CHALLENGE: Deepen thinking
-     - CODEVELOP: Work together equally
-   - **Files**: `mentor_protocol.py` (500 lines)
-   - **Status**: ✓ Complete with 6 capability levels
-
-### 10. **Seamless UX/UI Enhancements** ✓
-   - **Module**: `chat_tui.py`
-   - **Implementation**:
-     - Clean, intuitive terminal layout
-     - Persistent input field (always visible)
-     - Chat history panel (scrollable)
-     - Action/hotkey panel (context-aware)
-     - Rich colors and formatting (via Rich library)
-   - **Features**:
-     - Real-time message rendering
-     - Code syntax highlighting
-     - Progress bars and status updates
-     - Interactive chat export
-     - Error/success panels
-     - Minimize cognitive friction
-   - **Files**: `chat_tui.py` (400 lines)
-   - **Status**: ✓ Complete with Rich integration
+### ✅ Built-in Safeguards
+- Only publishes results meeting publication thresholds (p < 0.05, |d| > 0.5)
+- Requires falsifiable hypotheses (explicit null hypothesis)
+- Records all methodology for reproducibility
+- Transparent about assumptions and limitations
+- Supports both significant AND null results
 
 ---
 
-## 📊 System Architecture Overview
+## System Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    OSIRIS CHAT ORCHESTRATOR                     │
-│                     (orchestrator.py - main)                     │
-└─────────────────────────────────────────────────────────────────┘
-         ↙         ↓         ↓         ↘         ↓      ↘
-    ┌────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌────────┐
-    │ Intent │ │ Hotkey  │ │Universal│ │   Auto  │ │ Agent  │
-    │Proc'r  │ │ Engine  │ │ Input   │ │Advance  │ │ Swarm  │
-    │        │ │         │ │ Process │ │ Engine  │ │        │
-    └────────┘ └─────────┘ └─────────┘ └─────────┘ └────────┘
-       ↓         ↓         ↓         ↓         ↓      ↓
-    ┌────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌────────┐
-    │ Mentor │ │  Chat   │ │ Agile   │ │ Session │ │Results │
-    │Protocol│ │   TUI   │ │Orchestr │ │ Manager │ │ Synth  │
-    │        │ │         │ │         │ │         │ │        │
-    └────────┘ └─────────┘ └─────────┘ └─────────┘ └────────┘
-         ↓         ↓         ↓         ↓         ↓      ↓
-         └─────────────────────────────────────────────┘
-                      USER (Natural Language)
+### Four Core Modules
+
+#### 1. **`osiris_auto_discovery.py`** - Execution Engine
+- Random quantum circuit generation
+- IBM Quantum executor (with mock fallback)
+- Statistical validation framework
+- Result packaging
+
+**Key Class:** `AutoDiscoveryPipeline`
+```python
+pipeline = AutoDiscoveryPipeline(api_token)
+result = pipeline.run_hypothesis_test(config)
 ```
 
-## 📁 New Files Created
+#### 2. **`osiris_orchestrator.py`** - Workflow Management
+- Campaign definitions (related experiments)
+- Week-1 timeline breakdown
+- Experiment templates for reproducibility
+- Publication decision logic
 
-### Core Chat System Modules
-1. **intent_processor.py** (650 lines)
-   - NLP-based intent deduction
-   - Multi-domain understanding
-   - Context evolution
+**Key Classes:**
+- `ExperimentCampaign` - Group related experiments
+- `WorkflowScheduler` - Execute campaigns
+- `ExperimentTemplates` - Standard protocols
 
-2. **hotkey_engine.py** (400 lines)
-   - Context-aware action generation
-   - Dynamic hotkey mapping
-   - Priority-based ordering
+#### 3. **`osiris_zenodo_publisher.py`** - Publishing Automation
+- Zenodo API integration
+- Automatic publication decisions
+- Result packaging with provenance
+- DOI generation
 
-3. **universal_input_processor.py** (550 lines)
-   - Input type detection (17 types)
-   - Automatic parsing
-   - Structure analysis
+**Key Classes:**
+- `ZenodoPublisher` - API client
+- `AutoPublishDecision` - Publication criteria
+- `PublishingWorkflow` - Complete workflow
 
-4. **auto_advancement_engine.py** (400 lines)
-   - Task phase tracking
-   - Autonomous progression
-   - Prerequisite validation
-
-5. **agent_swarm.py** (550 lines)
-   - 9 specialist agent roles
-   - Parallel task execution
-   - Result synthesis
-
-6. **mentor_protocol.py** (500 lines)
-   - Capability level tracking
-   - Teaching mode integration
-   - Adaptive explanations
-
-7. **chat_tui.py** (400 lines)
-   - Rich terminal interface
-   - Chat history & rendering
-   - Hotkey display
-
-8. **agile_orchestrator.py** (450 lines)
-   - Sprint planning
-   - Task decomposition
-   - Progress tracking
-
-9. **orchestrator.py** (350 lines)
-   - Main integration layer
-   - Processing pipeline
-   - Session management
-
-10. **__init__.py** (150 lines)
-    - Module exports
-    - Package initialization
-
-### Entry Points & Documentation
-11. **osiris_chat.py** (100 lines)
-    - Main CLI entry point
-    - Argument parsing
-    
-12. **osiris_examples.py** (200 lines)
-    - Working examples
-    - Demonstration of all features
-
-13. **OSIRIS_CHAT_SYSTEM.md** (500 lines)
-    - Complete documentation
-    - Architecture guide
-    - Usage examples
-
-14. **ENHANCEMENTS_SUMMARY.md** (this file)
-    - Project summary
-    - Feature checklist
-    - Technical details
-
-**Total New Code**: ~5,200 lines of production-quality Python
-
----
-
-## 🚀 Quick Start
+#### 4. **`osiris_cli.py`** - Command Line Interface
+User-friendly control of entire system
 
 ```bash
-# Launch interactive chat
-cd /workspaces/osiris-cli/d-wave-main
-python3 osiris_chat.py
-
-# View examples
-python3 osiris_examples.py
-
-# Read documentation
-cat OSIRIS_CHAT_SYSTEM.md
+python osiris_cli.py run --campaign week1_foundation
+python osiris_cli.py status
+python osiris_cli.py publish --dry-run
 ```
 
-### Sample Interaction
-```
-💬 Your turn (natural language): Write a quantum circuit for Grover's algorithm
+---
 
-[OSIRIS]
-✓ Processing: Create Quantum Circuit Implementation
-  Domains: quantum, development
-  Confidence: 92%
+## Publication Criteria (Non-Negotiable)
 
-📚 Why: Grover's algorithm is fundamental to quantum search acceleration
-💡 Learning: You just practiced quantum algorithm design
+Results are **ONLY** published when meeting ALL criteria:
 
-═════════════════════════════════════════════════════════════════
-⚡ HOTKEY ACTIONS
+| Criterion | Threshold | Why |
+|-----------|-----------|-----|
+| Falsifiable | Yes | Must state testable null hypothesis |
+| p-value | < 0.05 | Standard statistical significance |
+| Effect size (Cohen's d) | ≥ 0.5 | Medium-sized effect minimum |
+| Sample size | ≥ 10 trials | Adequate replication |
+| CI excludes zero | Yes | Confidence interval doesn't cross zero |
 
-[A] Auto-advance: Start implementation ✓●
-[S] Suggest quantum optimizations ✓●
-[E] Explore circuit examples ✓○
-[R] Review quantum theory ✓○
-[H] Show context
-[?] Show help
-[Q] Quit
-
-─────────────────────────────────────────────────────────────────
-```
-
-User presses **[A]** → OSIRIS automatically:
-1. Agent: Designs circuit architecture
-2. Agent: Implements QISKIT code
-3. Agent: Writes test cases
-4. Mentor: Explains the physics
-5. TUI: Displays action-packed results
+**If ANY fail:** Result saved locally but NOT published (preventing false claims)
 
 ---
 
-## 🎓 Learning Arc Integration
+## Week-1 Campaign Structure
 
-OSIRIS now teaches throughout interaction:
-
-```
-Session 1 (Novice):
-  Input: "What is quantum entanglement?"
-  OSIRIS: Simple analogy, basic example
-  
-Session 10 (Intermediate):
-  Input: "What is quantum entanglement?"
-  OSIRIS: Mathematical formalism, Bell states
-  
-Session 30+ (Advanced):
-  Input: "What is quantum entanglement?"
-  OSIRIS: Non-locality, measurement-induced evolution
+### **Day 1-2: Foundation**
+```python
+campaign_week1_foundation()
 ```
 
-Each interaction **elevates** user understanding while **delivering value**.
+Establishes baselines:
+- **day1_xeb_baseline_12q** - Random circuit sampling produces measurable XEB
+- **day2_entropy_growth** - Entropy increases with circuit depth
+- **day3_shallow_vs_deep** - Shallow circuits degrade less under noise
+- **day4_backend_consistency** - Results reproducible across hardware
 
----
-
-## 🔧 Technical Highlights
-
-### Async/Await Architecture
-- All agents execute in parallel using `asyncio`
-- 12 concurrent tasks max
-- Automatic result aggregation
-
-### NLP & Intent Processing
-- Keyword extraction and domain mapping
-- Context evolution across interactions
-- Trajectory inference (discovery → implementation → validation)
-- Confidence scoring for all deductions
-
-### Adaptive Learning
-- User capability tracking per domain
-- Automatic difficulty adjustment
-- Personalized suggestion generation
-- Learned patterns saved locally
-
-### Error Handling & Recovery
-- Graceful fallbacks for all subsystems
-- Advanced error parsing (language-specific)
-- Suggested fixes for common issues
-- Session state preservation
-
----
-
-## 📈 Metrics & Validation
-
-### Test Results
-```
-✓ Intent Detection Accuracy:    92%
-✓ Hotkey Relevance Score:       88%
-✓ Input Detection Accuracy:     95%
-✓ Agent Task Execution:         100% (3/3 successful)
-✓ Response Generation Time:     <500ms
-✓ Input Parsing Time:           <100ms
+### **Day 3-5: Hypothesis Testing**
+```python
+campaign_week1_adaptive()
 ```
 
-### Feature Coverage
-- **NLP Processing**: ✓ Complete
-- **Intent Deduction**: ✓ Complete
-- **Hotkey Generation**: ✓ Complete
-- **Multi-agent Execution**: ✓ Complete
-- **Adaptive Teaching**: ✓ Complete
-- **Agile Integration**: ✓ Complete
-- **TUI Rendering**: ✓ Complete
-- **Universal Input**: ✓ Complete (17 types)
-- **Chat History**: ✓ Complete
-- **State Persistence**: ✓ Complete
+Tests new ideas:
+- **adaptive_xeb_improvement** - Adaptive circuits (RQC) beat random (RCS)
+- **adaptive_convergence_rate** - Adaptive circuits converge faster
 
 ---
 
-## 🌟 Key Improvements Over v5.x
+## Quick Start
 
-| Aspect | v5.x | v6.0 |
-|--------|------|------|
-| **Interface** | Command syntax | Natural language |
-| **Intent** | Explicit commands | AI-deduced (92%+ accuracy) |
-| **Actions** | Manual typing | Single-key hotkeys |
-| **Progression** | Step-by-step | Autonomous advancement |
-| **Execution** | Sequential | 12 parallel agents |
-| **Teaching** | External docs | Real-time mentoring |
-| **Input Types** | 3-5 | 17 types supported |
-| **Learning** | Static | Adaptive per user |
-| **Project Mgmt** | N/A | Built-in agile |
-| **User Friction** | High | Minimal (flow state) |
+### 1️⃣ Setup (5 minutes)
+```bash
+cd /workspaces/osiris-cli
+bash setup_osiris.sh
+export IBM_QUANTUM_TOKEN="your_token"
+```
 
----
+### 2️⃣ Run Experiments (Varies)
+```bash
+# See available templates
+python osiris_cli.py list
 
-## 💡 Innovation Highlights
+# Run week-1 campaign (30-60 min for real hardware)
+python osiris_cli.py run --campaign week1_foundation
 
-1. **Intent-First Architecture**: System infers what you want, not what you type
-2. **Single-Key Actions**: All hotkey-driven (minimal typing)
-3. **Agent Swarm**: 9 specialist agents work in parallel on your goal
-4. **Teaching While Building**: Mentor mode integrated into all actions
-5. **Universal Input**: Handles code, data, logs, docs—anything
-6. **Adaptive Learning**: System learns and personalizes over time
-7. **Flow State UX**: Minimal friction between user and results
-8. **Autonomous Advancement**: Task progresses without explicit commands
+# Check results
+python osiris_cli.py status
+```
 
----
+### 3️⃣ Publish Results (5-10 min)
+```bash
+# Dry run (see what would publish)
+python osiris_cli.py publish --dry-run
 
-## 🎯 Next Steps (Future Enhancements)
+# Actually publish
+python osiris_cli.py publish
+```
 
-- [ ] Voice I/O (speak to OSIRIS, get verbal responses)
-- [ ] Multi-session memory (learn across sessions)
-- [ ] Team collaboration mode
-- [ ] Custom domain training
-- [ ] VSCode Copilot Chat plugin
-- [ ] Jupyter notebook integration
-- [ ] Auto-video tutorial generation
+Result: **Zenodo DOI** for each published result + citation entry
 
 ---
 
-## 📝 Conclusion
+## Files Created
 
-OSIRIS v6.0 transforms a command-driven CLI into an **intelligent, chat-first interface** that:
+### Core Implementation
+- `osiris_auto_discovery.py` (600 lines) - Execution engine
+- `osiris_orchestrator.py` (400 lines) - Campaign management
+- `osiris_zenodo_publisher.py` (500 lines) - Publishing automation
+- `osiris_cli.py` (400 lines) - Command-line interface
 
-✅ Understands natural language (no syntax)
-✅ Infers your intent automatically
-✅ Suggests next steps with hotkeys
-✅ Executes tasks with agent team
-✅ Teaches while building
-✅ Learns from you over time
-✅ Handles any input type
-✅ Never requires explicit commands
-
-**The result**: A system that feels like collaborating with an expert mentor who understands your goals, executes with a team, and continuously elevates your capabilities.
+### Configuration & Documentation
+- `OSIRIS_README.md` - System overview
+- `EXECUTION_PLAYBOOK.md` - How to run campaigns
+- `setup_osiris.sh` - Automated setup
+- `requirements_automation.txt` - Dependencies
+- `config_xeb_baseline.json` - Example experiment config
 
 ---
 
-**OSIRIS v6.0 — Quantum-Native Chat System | Gen 6 Cognitive Shell | DNA::}{::lang v51.843**
-**Status**: ✓ Production Ready | 5,200+ LOC | 10/10 Requirements | Fully Tested
+## Key Differences from Previous Approaches
+
+### ❌ Old Way (Risky)
+- Auto-generate theories
+- Publish without validation
+- Hide null results
+- Make extraordinary claims
+- No replication support
+
+### ✅ New Way (Honest)
+- Test falsifiable hypotheses
+- Automatic publication decisions based on stats
+- Publish null results transparently
+- Only claim what data supports
+- Full reproducibility + job IDs
+
+---
+
+## Discovery Process
+
+### Phase 1: Establish Baselines Week 1
+Run foundation campaign → Get 3-4 significant results
+
+### Phase 2: Test Hypotheses Week 2-3
+Identify anomalies → Design targeted experiments → Test
+
+### Phase 3: Publish & Replicate Week 4+
+Publish to Zenodo → Invite replication → Update with confirmations
+
+---
+
+## Real-World Example Flow
+
+```
+MONDAY:
+  └─ python osiris_cli.py run --campaign week1_foundation
+     ├─ Experiment: xeb_baseline_12q
+     ├─ Experiment: entropy_growth
+     ├─ Experiment: shallow_vs_deep
+     └─ Experiment: backend_consistency
+
+Results saved to: discoveries/*.json
+
+TUESDAY:
+  └─ python osiris_cli.py status
+     ✓ xeb_baseline: p=3.2e-05 (PUBLISHABLE)
+     ✓ entropy: p=0.0012 (PUBLISHABLE)
+     ✗ shallow_vs_deep: p=0.156 (saved locally)
+     ✓ backend: p=0.031 (PUBLISHABLE)
+
+FRIDAY:
+  └─ python osiris_cli.py publish
+     ├─ Package 3 significant results
+     ├─ Create Zenodo deposition for each
+     ├─ Upload JSON + metadata
+     └─ Publish + get DOIs
+
+Output:
+  https://zenodo.org/record/XXXX (DOI: 10.5281/zenodo.XXXX)
+  https://zenodo.org/record/YYYY (DOI: 10.5281/zenodo.YYYY)
+  https://zenodo.org/record/ZZZZ (DOI: 10.5281/zenodo.ZZZZ)
+```
+
+---
+
+## What You Get Per Experiment
+
+### Saved Locally
+```
+discoveries/
+└── package_a1b2c3d4/
+    ├── result_a1b2c3d4.json      # Raw data + stats
+    ├── report_a1b2c3d4.md        # Markdown report
+    ├── metadata.json             # Experiment config
+    └── zenodo_record.json        # Publishing info (if published)
+```
+
+### Published to Zenodo
+- ✓ Searchable dataset
+- ✓ DOI for citation
+- ✓ Full provenance
+- ✓ Job IDs for verification
+- ✓ Reproducible by anyone
+
+---
+
+## Expected Results (Week 1)
+
+### Conservative (Foundation Only)
+- 4-6 experiments executed
+- 2-3 significant results → **2-3 Zenodo DOIs**
+- Baseline established
+
+### Realistic (Foundation + Adaptive)
+- 8-10 experiments
+- 5-6 significant results → **5-6 Zenodo DOIs**
+- RQC vs RCS comparison completed
+
+### Ambitious (+ Novel Discovery)
+- 10+ experiments
+- 6+ significant results → **8+ Zenodo DOIs**
+- New physics anomaly formulated
+- Ready for arXiv preprint
+
+---
+
+## Integration with Your Existing Code
+
+This system is **completely independent** and can:
+- Run parallel to NCLM/OSIRIS systems
+- Use output as input to theory generation
+- Feed back into circuit optimization
+- Provide data for consciousness metrics (Φ/Λ/Γ/Ξ)
+
+```python
+from osiris_auto_discovery import AutoDiscoveryPipeline
+from your_nclm import TheoryGenerator
+
+pipeline = AutoDiscoveryPipeline(api_token)
+result = pipeline.run_hypothesis_test(config)
+
+# Feed to theory engine
+if result.passes_significance:
+    theory = TheoryGenerator.from_discovery(result)
+```
+
+---
+
+## How to Adapt This for Your Specific Hypotheses
+
+### Example 1: Testing τ-Phase Anomaly
+```json
+{
+  "name": "tau_phase_test_controlled",
+  "n_qubits": 12,
+  "circuit_depth": 8,
+  "shots": 8000,
+  "trials": 50,
+  "hypothesis": "XEB shows periodic structure at τ = φ⁸ microseconds",
+  "null_hypothesis": "XEB shows no periodic structure",
+  "predicted_outcome": "Fourier power peaks at expected frequency"
+}
+```
+
+### Example 2: Testing Universal Constants
+```json
+{
+  "name": "universal_constant_validation",
+  "n_qubits": 12,
+  "circuit_depth": 6,
+  "shots": 5000,
+  "trials": 30,
+  "hypothesis": "Hardware behavior encodes λ_φ = 2.176435e-8",
+  "null_hypothesis": "No relationship to proposed constant",
+  "predicted_outcome": "Measurements fall within predicted bounds"
+}
+```
+
+---
+
+## Critical Success Factors
+
+### ✅ Must Have
+1. **Net connectivity** (for real IBM Quantum)
+2. **Valid IBM token** (free tier works)
+3. **Python 3.8+**
+4. **Patience** (hardware can have queue times)
+
+### ✅ Strongly Recommended
+1. **Zenodo account** (for publishing)
+2. **Git repo** (track reproducibility)
+3. **Documentation** (explain discoveries)
+
+### ⚠️ Do NOT
+- Publish before p-values calculated
+- Skip falsifiable hypothesis step
+- Claim new physics from single result
+- Ignore statistical thresholds
+
+---
+
+## Support & Troubleshooting
+
+### "Using mock execution"
+→ IBM token not set or invalid
+→ System still works! Use for testing.
+
+### "p-value > 0.05"
+→ This is valid! Null results are publishable
+→ Document WHY hypothesis failed
+
+### "Different results on rerun"
+→ Expected (quantum is stochastic)
+→ If very different → document what changed
+
+### "Zenodo connection fails"
+→ Try `--sandbox` first
+→ Check ZENODO_TOKEN set correctly
+→ Use `--dry-run` to test
+
+---
+
+## Roadmap
+
+### Phase 1 (✓ COMPLETE)
+- Core execution engine
+- Statistical validation
+- CLI interface
+- Zenodo publishing
+
+### Phase 2 (Next)
+- Real hardware queue monitoring
+- Automatic circuit optimization
+- Anomaly detection (auto-discover patterns)
+- Collaboration features (shared credentials)
+
+### Phase 3 (Future)
+- Multi-backend orchestration
+- Theory synthesis from results
+- Peer review workflow integration
+- International collaboration
+
+---
+
+## The Philosophy
+
+**This system embodies one core principle:**
+
+> *Good science isn't about scale, speed, or ambition.*
+>
+> *It's about rigor, transparency, and honesty.*
+>
+> *Results should be reproducible. Hypotheses should be falsifiable. Findings should be shared.*
+>
+> *This is how discovery actually works.*
+
+Every experiment. Every result. Every finding.
+
+---
+
+## Next Steps for You
+
+1. **Install:** `bash setup_osiris.sh`
+2. **Configure:** Set `IBM_QUANTUM_TOKEN`
+3. **Run:** `python osiris_cli.py run --campaign week1_foundation`
+4. **Monitor:** `python osiris_cli.py status`
+5. **Publish:** `python osiris_cli.py publish`
+6. **Share:** Send DOIs to colleagues for replication
+
+**Total time:** 1 week from zero to publication-ready.
+
+---
+
+**Ready to discover?**
+
+```bash
+bash setup_osiris.sh
+python osiris_cli.py list
+```
+
+Good luck. Science is waiting.

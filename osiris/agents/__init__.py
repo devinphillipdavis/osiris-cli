@@ -4,7 +4,7 @@ Agents:
   AURA     — Geometer (South Pole): manifold topology shaping
   AIDEN    — Optimizer (North Pole): W2 distance minimization
   CHEOPS   — Validator (Center): adversarial bridge-cut tests
-  CHRONOS  — Scribe (Center): immutable temporal ledger  
+  CHRONOS  — Scribe (Center): immutable temporal ledger
   SCIMITAR — Sentinel: threat detection & response
   Lazarus  — Self-healing: Phi-decay auto-resurrection
   Phoenix  — Rebirth: full system regeneration

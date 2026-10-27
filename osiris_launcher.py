@@ -46,11 +46,14 @@ def check_environment():
     print("\n" + "="*70)
 
 def cmd_chat(args):
-    """Launch chat-native TUI"""
-    print("\n⚛ Launching OSIRIS Chat Interface...\n")
-
-    from osiris_tui_core import run_textual_mode
-    run_textual_mode()
+    """The OSIRIS REPL (the `osiris` command); --tui keeps the Textual interface."""
+    if getattr(args, 'tui', False):
+        print("\n⚛ Launching OSIRIS Chat Interface (Textual TUI)...\n")
+        from osiris_tui_core import run_textual_mode
+        run_textual_mode()
+        return
+    from osiris_cli.osiris_repl import main as repl_main
+    repl_main([])
 
 def cmd_benchmark(args):
     """Run quantum hardware benchmarking"""
@@ -63,7 +66,7 @@ def cmd_benchmark(args):
 
     # Determine mode
     extreme = not args.quick
-    results = benchmarker.benchmark_all_backends(extreme_mode=extreme)
+    benchmarker.benchmark_all_backends(extreme_mode=extreme)
 
     # Print report
     print(benchmarker.generate_report())
@@ -150,7 +153,6 @@ def cmd_publish(args):
 def build_status_report():
     """Return a bounded, read-only report without probing or mutating services."""
     import importlib.metadata
-    import json
     from osiris.runtime.report import capability_status
 
     try:
@@ -247,9 +249,6 @@ def cmd_bridges(args):
     print(bridge_report.summary())
 
     # Extract key metrics for compact display
-    prop_results = [r for r in bridge_report.results if r.bridge == "Propulsion"]
-    energy_results = [r for r in bridge_report.results if r.bridge == "Energy"]
-    cosmo_results = [r for r in bridge_report.results if r.bridge == "Cosmological"]
 
     sig_count = sum(1 for r in bridge_report.results if r.is_significant())
     print(f"\n  Significant results (p < 0.05): {sig_count}/{len(bridge_report.results)}")
@@ -986,7 +985,7 @@ def cmd_loop(args):
         print(f"  Seeded {n} default organisms")
 
     print()
-    results = loop.run(generations=args.generations, verbose=True)
+    loop.run(generations=args.generations, verbose=True)
 
     summary = loop.summary()
     print(f"\n  Cycles: {summary['total_cycles']}")
@@ -1169,7 +1168,7 @@ def cmd_help(args):
 ⚛ OSIRIS QUANTUM DISCOVERY SYSTEM v4.0
 
 Commands:
-  
+
   chat              Launch chat-native TUI interface
   benchmark         Run quantum hardware benchmarking suite
   run               Execute experiment campaign
@@ -1297,49 +1296,49 @@ Environment Variables:
   IBM_BACKEND               Backend to use (default: ibm_torino)
 
 Examples:
-  
+
   # Start chat interface
   osiris chat
-  
+
   # Benchmark all backends with extreme parameters
   osiris benchmark
-  
+
   # Run full week-1 campaign
   osiris run --campaign week1_foundation
-  
+
   # Run the full OSIRIS orchestrator pipeline
   osiris orchestrate
-  
+
   # Provision FABRIC Living Slice
   osiris fabric --sites UKY NCSA CERN --topology mesh
-  
+
   # Upcycle POLANCO policies
   osiris policy --source campus
-  
+
   # Run Dr. Fei 3-act demo
   osiris demo --fab
-  
+
   # Run physics bridges
   osiris bridges --output results.json
-  
+
   # Launch 9-agent swarm
   osiris swarm --task "optimize torsion field solver"
-  
+
   # Adversarial bridge validation
   osiris validate --trials 500 --output validation.json
-  
+
   # ELO tournament against industry competitors
   osiris tournament --rounds 10 --output tournament.json
-  
+
   # Cognitive mesh dashboard with simulated rounds
   osiris mesh --simulate 20
-  
+
   # Introspection engine with simulated rounds
   osiris introspect --simulate 15 --output introspection.json
-  
+
   # Full tridirectional feedback loop
   osiris feedback --task "optimize torsion field solver" --rounds 5
-  
+
   # Check system status
   osiris status
 """
@@ -1451,7 +1450,7 @@ def cmd_forge(args):
 
 def cmd_license(args):
     """Run license compliance check"""
-    from osiris_license import ComplianceGate, EnvironmentDetector, LicenseValidator
+    from osiris_license import EnvironmentDetector, LicenseValidator
 
     if hasattr(args, 'validate') and args.validate:
         valid, msg = LicenseValidator.validate(args.validate)
@@ -1484,7 +1483,8 @@ def main():
     subparsers = parser.add_subparsers(dest='command', help='Command to run')
 
     # Chat command
-    subparsers.add_parser('chat', help='Launch chat interface')
+    chat_parser = subparsers.add_parser('chat', help='The OSIRIS REPL (same as `osiris`)')
+    chat_parser.add_argument('--tui', action='store_true', help='Use the Textual TUI instead')
 
     # Benchmark command
     bench_parser = subparsers.add_parser('benchmark', help='Run benchmarking')

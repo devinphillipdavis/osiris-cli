@@ -1,0 +1,29 @@
+{
+  "grant_id": "GRANT-TAU-ERRATUM-001",
+  "grant_type": "SCIENTIFIC_ERRATUM_GOVERNANCE_AUDIT",
+  "subject": "Tau-Phase Anomaly & Theta-Lock Refutation (Erratum v4.2.0)",
+  "organism_id": "tau_phase_erratum_study",
+  "merkle_root": "7e8f20c2e0ce1ca12584a884b9f3b0a741936090a0ac36b2ae10a176673f5713",
+  "leaf_hashes": {
+    "H_source": "16dcc394f3e6cd3c68c11b6cc71097d7e23933016e0ac7c0c0ecb8a51694cbf8",
+    "H_formalize": "8c9f543e29c64503fed0a42436d6c3b908021dff5cb87aa29cd8b5fca936817a",
+    "H_challenge": "073d95e0103dd72b4e55fbd0aec75f9cb7573bd90f0a6e47bc45f86a3cd68fa3",
+    "H_experiment": "06bb51afef3b93a3be61d11b64bdb95e1c81fa6acdd85f12fed62ed28dc8de4d"
+  },
+  "claims_firewall_status": {
+    "THETA_LOCK": "REFUTED",
+    "K8_REVIVAL": "REFUTED",
+    "F_MAX": "REFUTED",
+    "LAMBDA_PHI": "NOT_MEASURED",
+    "NEGENTROPY_136": "ARTIFACT_DISPROVED"
+  },
+  "operational_invariants": {
+    "operational_allowed": false,
+    "runtime_coherence_floor": 0.092,
+    "universal_memory_invariant_kg": 2.176435e-08,
+    "bell_state_fidelity_ceiling_allowed": false
+  },
+  "governance_standard": "SYS-021 / SYS-023 / SYS-024",
+  "timestamp_utc": "2026-10-27T03:07:38.533907+00:00",
+  "status": "SEALED_REFUTED"
+}

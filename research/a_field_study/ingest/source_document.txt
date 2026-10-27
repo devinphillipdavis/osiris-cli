@@ -1,0 +1,33 @@
+================================================================================
+TITLE: The Fine-Structure Constant as an A-Field Quantity: Impedance, Flux,
+       and the Pair Structure of Its Prefactor
+DATE:  2026-10-12
+STATUS: Pre-Print / Discussion Draft
+DOCUMENT_TYPE: Physical & Mathematical Analysis
+================================================================================
+
+ABSTRACT:
+We examine the formulation of the Sommerfeld fine-structure constant alpha in terms
+of macroscopic vacuum impedance (Z_0) and quantum electrical quantities (the von
+Klitzing constant R_K, the conductance quantum G_0, and the magnetic flux quantum
+Phi_0). We demonstrate that alpha can be expressed algebraically as:
+  (1) alpha = Z_0 / (2 * R_K)
+  (2) alpha = (1/4) * G_0 * Z_0
+  (3) alpha = (e * Z_0) / (4 * Phi_0)
+  (4) alpha = (h * Z_0) / (8 * Phi_0^2)
+
+We observe that the numerical prefactors in these representations obey a uniform
+power-of-two bookkeeping rule:
+  prefactor = (1/2) * (1/2)^n
+where n indexes the pairing multiplicity of the underlying quantum charge and flux
+representations.
+
+We propose a physical interpretation wherein the invariant prefactor 1/2 corresponds
+to an outgoing-and-returning electromagnetic vector potential (A-field) pair,
+analogous to the geometric decomposition of the sphere surface 4*pi*r^2 = (2*pi*r)*(2*r).
+
+We identify three unresolved theoretical problems required to establish this model:
+  1. Derivation of the field-pair factor from the microscopic A-field wave equations.
+  2. Explanation of the scale dependence (running coupling) of alpha(Q^2) within QED.
+  3. Ab initio derivation of the numerical magnitude of alpha (~1/137.0359992).
+================================================================================

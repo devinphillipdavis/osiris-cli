@@ -64,7 +64,7 @@ FACTS_FILE = "facts.jsonl"
 # 7B mentor on the same CPU) waits; the marker is refreshed on every message.
 CHAT_MARKER = "chat.active"
 CHAT_QUIET_SECONDS = 300
-MENTOR_MAX_TOKENS = int(os.environ.get("OSIRIS_MENTOR_MAX_TOKENS", "700"))
+MENTOR_MAX_TOKENS = int(os.environ.get("OSIRIS_MENTOR_MAX_TOKENS", "2048"))
 MENTOR_TIMEOUT = float(os.environ.get("OSIRIS_MENTOR_TIMEOUT", "180"))
 CLAIMS_PER_MESSAGE = 3          # registered claims shown before a reply
 MENTOR_NUM_CTX = int(os.environ.get("OSIRIS_MENTOR_NUM_CTX", "4096"))
@@ -81,7 +81,7 @@ MESSAGE_BUDGET = 6000
 # qwen2.5:7b timed out (180 s) on two of the three and took 140 s on the third. The 3B adds
 # new prompt tokens at ~30/s against the 7B's ~14/s. Both misstate recorded results at
 # times, which is why named verdicts and the claims register are printed by code first.
-MENTOR_PREFERENCE = ("qwen2.5:3b", "qwen2.5:7b", "qwen2.5:1.5b", "llama3.2:3b", "llama3.2:1b", "smollm2:360m")
+MENTOR_PREFERENCE = ("qwen2.5:3b", "gemma2:2b", "gemma:2b", "qwen2.5:7b", "qwen2.5:1.5b", "llama3.2:3b", "llama3.2:1b", "smollm2:360m")
 # Measured 2026-10-02 on the 8-core WSL desktop: qwen2.5:7b reads a prompt at ~26 tokens/s
 # after a 17 s cold load; qwen2.5:1.5b at ~146 tokens/s. With the system prompt a long
 # message is ~14k characters (~4k tokens): ~170 s before the 7B says anything, so both
@@ -539,22 +539,6 @@ def score_rank(score: list) -> tuple:
     return scorer_of(score), score[2]
 
 
-def _lock(f) -> None:
-    try:
-        import fcntl
-        fcntl.flock(f.fileno(), fcntl.LOCK_EX)
-    except (ImportError, OSError):     # no flock (e.g. Windows): single-writer behaviour as before
-        pass
-
-
-def _unlock(f) -> None:
-    try:
-        import fcntl
-        fcntl.flock(f.fileno(), fcntl.LOCK_UN)
-    except (ImportError, OSError):
-        pass
-
-
 def _last_hash(f, block: int = 65536) -> Optional[str]:
     """The "hash" of the last non-empty line of an open binary file, read backwards in blocks (a line can be a
     100k-character paste). None for an empty file; None also if the last line is not JSON (the caller falls back)."""
@@ -578,14 +562,32 @@ def _last_hash(f, block: int = 65536) -> Optional[str]:
     return None
 
 
+#: Captures currently in force, outermost first. Nested captures (a model reply inside a
+#: command) share the terminal, so pausing restores the OUTERMOST saved mode.
+_TYPEAHEAD_STACK: List["TypeAhead"] = []
+
+
+def _read_pending(fd: int) -> bytes:
+    import select
+    try:
+        return drain_input(lambda: os.read(fd, 4096), lambda t: bool(select.select([fd], [], [], t)[0]))
+    except OSError:
+        return b""
+
+
 class TypeAhead:
-    """While a reply streams, keys typed are captured instead of echoed into the
-    reply (2026-09-29: questions typed during a slow reply appeared after
-    'OSIRIS ›' and each answer looked one turn late). Ctrl-C still works.
+    """While a reply streams or a command prints, keys typed are captured instead of
+    echoed into the output (2026-09-29: questions typed during a slow reply appeared
+    after 'OSIRIS ›' and each answer looked one turn late; 2026-10-25: '/architecture'
+    typed during /check output was echoed into the bench table, looked lost, was
+    retyped, and arrived as '/architecture/architecture'). Ctrl-C still works.
+    Code that asks the user something mid-command reads through `paused()` (or
+    `PausingStdin`), which gives back normal, echoed line input for that read.
     Not a terminal: does nothing."""
 
     def __init__(self, active: bool):
         self.active, self.text, self._saved = active, "", None
+        self._raw = b""
 
     def __enter__(self):
         if self.active:
@@ -598,23 +600,81 @@ class TypeAhead:
                 termios.tcsetattr(fd, termios.TCSANOW, new)
             except (ImportError, OSError, ValueError, AttributeError):
                 self._saved = None
+        if self._saved is not None:
+            _TYPEAHEAD_STACK.append(self)
         return self
 
     def __exit__(self, *exc):
         if self._saved is None:
             return False
-        import select
         import termios
         fd = sys.stdin.fileno()
-        data = b""
         try:
-            data = drain_input(lambda: os.read(fd, 4096), lambda t: bool(select.select([fd], [], [], t)[0]))
-        except OSError:
-            pass
+            self._raw += _read_pending(fd)
         finally:
             termios.tcsetattr(fd, termios.TCSANOW, self._saved)
-        self.text = keys_typed(data.decode("utf-8", errors="replace"))
+            if self in _TYPEAHEAD_STACK:
+                _TYPEAHEAD_STACK.remove(self)
+        self.text = keys_typed(self._raw.decode("utf-8", errors="replace"))
         return False
+
+
+class paused:
+    """Normal echoed line input for one read inside a capture. Keys typed before the
+    question appeared stay with the capture (shown afterwards, never fed into the
+    answer); everything typed after it is the answer. Outside a capture: no-op."""
+
+    def __enter__(self):
+        self._outer = _TYPEAHEAD_STACK[0] if _TYPEAHEAD_STACK else None
+        if self._outer is None:
+            return self
+        import termios
+        fd = sys.stdin.fileno()
+        _TYPEAHEAD_STACK[-1]._raw += _read_pending(fd)
+        termios.tcsetattr(fd, termios.TCSANOW, self._outer._saved)
+        return self
+
+    def __exit__(self, *exc):
+        if self._outer is None or not _TYPEAHEAD_STACK:
+            return False
+        import termios
+        fd = sys.stdin.fileno()
+        new = list(self._outer._saved)
+        new[3] &= ~(termios.ECHO | termios.ICANON)
+        termios.tcsetattr(fd, termios.TCSANOW, new)
+        return False
+
+
+class PausingStdin:
+    """sys.stdin stand-in for the duration of a captured command: every read pauses
+    the capture, so forms and confirmations behave exactly as without it."""
+
+    def __init__(self, real):
+        self._real = real
+
+    def readline(self, *args):
+        with paused():
+            return self._real.readline(*args)
+
+    def read(self, *args):
+        with paused():
+            return self._real.read(*args)
+
+    def readlines(self, *args):
+        with paused():
+            return self._real.readlines(*args)
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        line = self.readline()
+        if not line:
+            raise StopIteration
+        return line
+
+    def __getattr__(self, name):
+        return getattr(self._real, name)
 
 
 def keys_typed(raw: str) -> str:
@@ -746,18 +806,17 @@ class Osiris:
     def _record(self, entry: dict) -> str:
         """Append one exchange, chained to the ledger's actual last entry. The previous hash is read from the file
         under an exclusive lock, not from this process's stats: on 2026-10-07 two consoles appended from their own
-        in-memory heads and the chain forked seven times (entries intact, links crossed)."""
-        with open(self.log_path, "ab+") as f:
-            _lock(f)
-            try:
-                entry["prev"] = _last_hash(f) or self.stats.get("last_head") or "0" * 64
-                body = json.dumps(entry, sort_keys=True, ensure_ascii=False)
-                entry["hash"] = hashlib.sha256(body.encode()).hexdigest()
-                f.seek(0, os.SEEK_END)
-                f.write((json.dumps(entry, ensure_ascii=False) + "\n").encode("utf-8"))
-                f.flush()
-            finally:
-                _unlock(f)
+        in-memory heads and the chain forked seven times (entries intact, links crossed). An unreadable last entry
+        raises chain_lock.ChainTailError instead of falling back to the in-memory head, which would fork again."""
+        from osiris_cli import chain_lock
+
+        def build(last):
+            entry["prev"] = last["hash"] if last else "0" * 64
+            body = json.dumps(entry, sort_keys=True, ensure_ascii=False)
+            entry["hash"] = hashlib.sha256(body.encode()).hexdigest()
+            return entry
+
+        chain_lock.append_chained(self.log_path, build, ensure_ascii=False)
         self.stats["last_head"] = entry["hash"]
         return entry["hash"]
 
@@ -969,8 +1028,9 @@ class Osiris:
         if voice is None:
             model = self.mentor.model()
             if model is None:
+                base_info = getattr(self.mentor, "base", "configured provider")
                 self.out("\nOSIRIS › I can't answer yet: my core hasn't earned its own voice and no "
-                         f"mentor model is reachable at {self.mentor.base}. Start one with `ollama serve`.\n")
+                         f"mentor model is reachable at {base_info}. Configure Gemma or start Ollama (`ollama serve`).\n")
                 self.history.pop()
                 return ""
             fast = getattr(self.mentor, "fast_model", lambda: None)()

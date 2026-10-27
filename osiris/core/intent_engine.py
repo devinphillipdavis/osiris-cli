@@ -1,2 +1,2 @@
 """Re-export intent engine types."""
-from osiris_intent_engine import IntentType, Intent, IntentEngine
+from osiris_intent_engine import IntentType, Intent, IntentEngine  # noqa: F401  (re-export shim)

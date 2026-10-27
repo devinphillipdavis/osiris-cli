@@ -1,72 +1,10 @@
-# nclm/enhanced_client.py (updated)
-# nclm/enhanced_client.py (updated sections)
-from typing import Dict, List, Optional
-class EnhancedDNALangCopilotClient:
-    """Enhanced client for DNALang Copilot with deep understanding capabilities"""
-
-    # ... existing initialization ...
-
-    async def deep_understand(self, prompt: str, max_depth: int = 5,
-                             quantum_strength: float = 0.7) -> Dict:
-        """Develop deep understanding of a complex topic"""
-        if not self.enable_quantum:
-            return {
-                "status": "failed",
-                "error": "Quantum processing (required for deep understanding) is disabled"
-            }
-
-        try:
-            logger.info(f"Starting deep understanding for: {prompt[:100]}")
-
-            result = await self._nclm_core.deep_understand(
-                prompt, max_depth, quantum_strength
-            )
-
-            if self.state_dir:
-                self._nclm_core.save_state(self.state_dir)
-
-            return result
-
-        except Exception as e:
-            logger.error(f"Deep understanding failed: {e}")
-            return {
-                "status": "failed",
-                "error": str(e),
-                "prompt": prompt
-            }
-
-    async def cognitive_analysis(self, prompt: str) -> Dict:
-        """Perform comprehensive cognitive analysis with deep understanding"""
-        try:
-            # Get standard analysis
-            analysis = await super().cognitive_analysis(prompt)
-
-            # Add deep understanding if in quantum mode
-            if (self.enable_quantum and
-                self.config.mode in [NCLMMode.QUANTUM, NCLMMode.GROK]):
-
-                deep_result = await self.deep_understand(prompt, max_depth=3)
-                if deep_result.get("status") == "success":
-                    analysis["analysis"]["deep_understanding"] = deep_result
-
-            return analysis
-
-        except Exception as e:
-            logger.error(f"Cognitive analysis with deep understanding failed: {e}")
-            return {
-                "status": "failed",
-                "error": str(e),
-                "prompt": prompt
-            }
-import asyncio
 import logging
 import math
-from typing import Dict, Optional, Any
+from typing import Dict, List, Optional
 from pathlib import Path
 from .enhanced_config import NCLMEnhancedConfig, NCLMMode
 from .enhanced_core import EnhancedNCLM
-from .enhanced_config import NCLMResult
-from .quantum_cognitive import QuantumCognitiveProcessor, QuantumConcept
+from .quantum_cognitive import QuantumCognitiveProcessor
 
 logger = logging.getLogger(__name__)
 
@@ -129,7 +67,6 @@ class EnhancedDNALangCopilotClient:
 
         # Create some entanglements between related concepts
         for domain, knowledge in self._nclm_core.domain_knowledge.items():
-            domain_concepts = knowledge.get("concepts", [])
             relationships = knowledge.get("relationships", {})
 
             # Entangle concepts that have relationships

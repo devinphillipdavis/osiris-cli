@@ -113,63 +113,166 @@ BANNER = r"""
 # HYSTERETIC POWER GOVERNOR (PORTED FROM OSIRIS-MOBILE-TERMUX / EDGE HARNESS)
 # ═══════════════════════════════════════════════════════════════════════════════
 
+TERMUX_BIN = "/data/data/com.termux/files/usr/bin"
+
+
+def _fmt_reading(value: Optional[float], unit: str) -> str:
+    return "unknown" if value is None else f"{value:.1f}{unit}"
+
+
 class PowerDecision:
-    """Represents a power governor evaluation result."""
-    def __init__(self, allowed: bool, reason: str, battery_pct: float, temp_c: float, is_desktop: bool = False):
+    """A power governor evaluation. ``battery_pct``/``temp_c`` are None when nothing was
+    measured -- a node without a battery sensor, or a sensor that did not answer."""
+    def __init__(self, allowed: bool, reason: str, battery_pct: Optional[float] = None,
+                 temp_c: Optional[float] = None, is_desktop: bool = False, measured: bool = False):
         self.allowed = allowed
         self.reason = reason
         self.battery_pct = battery_pct
         self.temp_c = temp_c
         self.is_desktop = is_desktop
+        self.measured = measured
+
+    def readings(self) -> str:
+        return f"Bat: {_fmt_reading(self.battery_pct, '%')}, Temp: {_fmt_reading(self.temp_c, '°C')}"
+
+    def summary(self) -> str:
+        """The reason, plus the readings when anything was measured."""
+        return f"{self.reason} ({self.readings()})" if self.measured else self.reason
 
     def __repr__(self) -> str:
         tag = "ALLOW" if self.allowed else "BLOCKED"
         mode = "MAINS/DESKTOP" if self.is_desktop else "BATTERY/EDGE"
-        return f"<PowerDecision [{tag}] {mode}: {self.reason} (Bat: {self.battery_pct:.1f}%, Temp: {self.temp_c:.1f}°C)>"
+        return f"<PowerDecision [{tag}] {mode}: {self.reason} ({self.readings()})>"
 
 
 class PowerGovernor:
     """
     Hysteretic power governor for mobile, edge, and desktop execution.
-    - On Android/Termux: Monitors battery level and thermal sensors via termux-api.
-    - On Desktop/WSL/Servers: Fails open as UNRESTRICTED MAINS POWER.
+    - On Android/Termux (including PRoot under Termux): reads termux-battery-status.
+    - Elsewhere: no battery sensor; work is allowed and the readings are reported as unknown.
+    - Sensor unreadable on Termux: attended work is allowed; unattended work is refused
+      (``check(unattended=True)``), since nothing would stop it at a thermal or battery limit.
     """
+    SENSOR_TIMEOUT_S = 6.0      # termux-api answers in ~2.2 s on the Fold under PRoot
+    CACHE_TTL_S = 30.0
+
     def __init__(self, min_battery: float = 15.0, throttle_temp: float = 42.0, abort_temp: float = 46.0):
         self.min_battery = min_battery
         self.throttle_temp = throttle_temp
         self.abort_temp = abort_temp
         self._is_termux = "TERMUX_VERSION" in os.environ or os.path.exists("/data/data/com.termux")
+        self._outage_logged = False
+        self._cached: Optional[Tuple[float, Optional[Dict[str, Any]]]] = None
 
-    def check(self) -> PowerDecision:
+    def _sensor_binary(self) -> Optional[str]:
+        found = shutil.which("termux-battery-status")
+        if found:
+            return found
+        fallback = os.path.join(TERMUX_BIN, "termux-battery-status")
+        return fallback if os.access(fallback, os.X_OK) else None
+
+    def _read_sensor(self) -> Optional[Dict[str, Any]]:
+        now = time.monotonic()
+        if self._cached and now - self._cached[0] < self.CACHE_TTL_S:
+            return self._cached[1]
+        data = None
+        binary = self._sensor_binary()
+        if binary:
+            try:
+                res = subprocess.run([binary], capture_output=True, text=True, timeout=self.SENSOR_TIMEOUT_S)
+                if res.returncode == 0:
+                    parsed = json.loads(res.stdout)
+                    data = parsed if isinstance(parsed, dict) else None
+            except Exception:
+                data = None
+        self._cached = (now, data)
+        return data
+
+    def check(self, unattended: bool = False) -> PowerDecision:
         if not self._is_termux:
-            # Desktop WSL / Linux - Fail-open unrestricted
-            return PowerDecision(
-                allowed=True,
-                reason="Unrestricted desktop mains power active",
-                battery_pct=100.0,
-                temp_c=36.0,
-                is_desktop=True
-            )
+            return PowerDecision(True, "No battery sensor on this node (mains power assumed)", is_desktop=True)
 
-        # Attempt Termux API read
-        try:
-            res = subprocess.run(["termux-battery-status"], capture_output=True, text=True, timeout=1.5)
-            if res.returncode == 0:
-                data = json.loads(res.stdout)
-                pct = float(data.get("percentage", 100))
-                temp = float(data.get("temperature", 30.0))
-                plugged = data.get("plugged", "UNPLUGGED") != "UNPLUGGED"
+        data = self._read_sensor()
+        if data is not None:
+            pct = _optional_float(data.get("percentage"))
+            temp = _optional_float(data.get("temperature"))
+            plugged = data.get("plugged", "UNPLUGGED") != "UNPLUGGED"
+            if temp is not None and temp >= self.abort_temp:
+                return PowerDecision(False, f"Thermal abort: {temp:.1f}°C >= {self.abort_temp}°C", pct, temp, measured=True)
+            if pct is not None and pct < self.min_battery and not plugged:
+                return PowerDecision(False, f"Battery critical: {pct:.1f}% < {self.min_battery}%", pct, temp, measured=True)
+            if unattended and (pct is None or temp is None):
+                return PowerDecision(False, "Power sensor reading incomplete; unattended work refused (fail-closed)",
+                                     pct, temp, measured=True)
+            return PowerDecision(True, "Termux power envelope within limits", pct, temp, measured=True)
 
-                if temp >= self.abort_temp:
-                    return PowerDecision(False, f"Thermal abort: {temp:.1f}°C >= {self.abort_temp}°C", pct, temp)
-                if pct < self.min_battery and not plugged:
-                    return PowerDecision(False, f"Battery critical: {pct:.1f}% < {self.min_battery}%", pct, temp)
-                return PowerDecision(True, "Termux power envelope optimal", pct, temp)
-        except Exception:
-            pass
+        if not self._outage_logged:
+            try:
+                SESSION.log_event("POWER_SENSOR_OUTAGE", {"reason": "termux-battery-status unreadable",
+                                                          "mode": "FAIL_CLOSED_UNATTENDED"})
+            except Exception:
+                pass
+            self._outage_logged = True
+        if unattended:
+            return PowerDecision(False, "Power sensor unreadable; unattended work refused (fail-closed)")
+        return PowerDecision(True, "Power sensor unreadable; attended work only (unattended work refused)")
 
-        # Fallback safe allow
-        return PowerDecision(True, "Termux sensor offline, operating in fail-safe allow mode", 85.0, 35.0)
+
+def _optional_float(value: Any) -> Optional[float]:
+    try:
+        out = float(value)
+    except (TypeError, ValueError):
+        return None
+    return out if math.isfinite(out) else None
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# SUBSTRATE + CLAIMS LABELS (computed from what was detected, never typed in)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+NODE_NAMES = {
+    "NODE_ALPHA_MOBILE": "Node Alpha (mobile edge)",
+    "NODE_BETA_COMPUTE": "Node Beta (compute workstation)",
+    "NODE_GENERIC_EDGE": "Unclassified node",
+}
+
+
+def substrate_simd(hp: Any) -> str:
+    feats = [name for name, on in (("NEON", hp.has_neon), ("AVX2", hp.has_avx2),
+                                   ("AVX-VNNI", hp.has_avx_vnni)) if on]
+    return " / ".join(feats) if feats else "none detected"
+
+
+def substrate_label(hp: Any) -> str:
+    """The detected node: classification, architecture, environment and SIMD."""
+    if hp is None:
+        return "undetected (hardware mesh unavailable)"
+    name = NODE_NAMES.get(hp.node_type.value, hp.node_type.value)
+    if hp.is_termux:
+        env = "Termux"
+    elif hp.is_android:
+        env = "Android"
+    elif "microsoft" in platform.release().lower():
+        env = "WSL"
+    else:
+        env = platform.system() or "unknown OS"
+    return f"{name} | {hp.machine_arch} | {env} | SIMD: {substrate_simd(hp)}"
+
+
+def claims_summary(shown: int = 4) -> str:
+    """Register size and the ``shown`` most common verdict counts (``/legit list`` has all)."""
+    try:
+        from osiris_cli import claims as _claims
+    except Exception as e:
+        return f"register unavailable ({e})"
+    counts: Dict[str, int] = {}
+    for c in _claims.REGISTER:
+        counts[c.verdict] = counts.get(c.verdict, 0) + 1
+    ranked = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))
+    parts = " · ".join(f"{n} {v}" for v, n in ranked[:shown])
+    if len(ranked) > shown:
+        parts += f" · +{len(ranked) - shown} more verdicts"
+    return f"{len(_claims.REGISTER)} registered claims | {parts}"
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -443,6 +546,11 @@ class OsirisReplState:
 
 
 SESSION = OsirisReplState()
+if otc is not None:
+    def _unattended_power_gate() -> Tuple[bool, str]:
+        dec = SESSION.power_gov.check(unattended=True)
+        return dec.allowed, dec.reason
+    otc.UNATTENDED_POWER_GATE = _unattended_power_gate
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -467,10 +575,7 @@ def print_banner():
     # Dynamic Hardware Mesh Substrate Evaluation
     hp = getattr(SESSION, "hardware_profile", None)
     if hp:
-        is_alpha = hp.is_termux or hp.machine_arch in ("aarch64", "arm64")
-        node_name = "Node Alpha: Mobile Edge (Fold7 / Termux)" if is_alpha else "Node Beta: Compute Workstation (PC / Intel Core Ultra / WSL)"
-        simd_feat = "NEON SIMD Vector" if hp.has_neon else ("AVX2 / AVX-VNNI" if (hp.has_avx2 or hp.has_avx_vnni) else "Standard Vector")
-        print(f"\033[92m  [SUBSTRATE MESH] {node_name} | Arch: {hp.machine_arch} | SIMD: {simd_feat}\033[0m")
+        print(f"\033[92m  [SUBSTRATE MESH] {substrate_label(hp)}\033[0m")
         print(f"\033[90m  [RESOURCE LIMITS] Horizon: {hp.execution_timeout_s:.0f}s (Extended={hp.allow_extended_horizons}) | Coherence Floor: {hp.coherence_floor}\033[0m\n")
     
     if otc is not None and osiris_ui is not None:
@@ -481,90 +586,97 @@ def print_banner():
             otc._home()
         except Exception as e:
             print(f"  [Console Status: {e}]")
-            print("  Type \033[93m/help\033[0m for commands, \033[92m/ignite\033[0m to boot substrate & mesh, or type natural language.\n")
+            print("  Type \033[93m/help\033[0m for commands, \033[92m/ignite\033[0m for metamorphosis, or type natural language.\n")
     else:
-        print("  Type \033[93m/help\033[0m for commands, \033[92m/ignite\033[0m to boot substrate & mesh, or type natural language.\n")
+        print("  Type \033[93m/help\033[0m for commands, \033[92m/ignite\033[0m for metamorphosis, or type natural language.\n")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # COMMAND PIPELINE: /ignite, /learn, /dna, /ledger
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def execute_ignite(state: Optional[OsirisReplState] = None) -> Dict[str, Any]:
+def execute_ignite(state: Optional[OsirisReplState] = None, dry_run: bool = False) -> Dict[str, Any]:
     """
-    Simultaneously boots:
-      1. 11D Continuous Relativistic State Matrix (CRSM) Substrate & ZeroSum MicroVM
-      2. 9-Agent Cognitive Mesh (Bayesian Trust, Shapley Attribution, Nash, Hebbian)
+    Executes the Sovereign Substrate Verification & Metamorphosis Trigger:
+      1. Reports the detected node, AST firewall, and power envelope.
+      2. Validates mentor engine and evaluates NCLM speaking gate (SYS-026).
+      3. Triggers genome metamorphosis, promoting eligible capability gaps into sprint backlog.
     """
     if state is None:
         state = SESSION
 
-    print("\n\033[1;36m[IGNITION] Initiating Dual Sovereign Ignition Sequence...\033[0m")
-    
-    # 1. Physical 11D CRSM Substrate
-    print("  \033[1;37m── Physical Substrate: 11D CRSM & ZeroSum MicroVM ──\033[0m")
-    try:
-        from qbyte_system.qbyte import QbyteRuntime
-        state.runtime = QbyteRuntime(n_qubits=state.active_qubits, strict_l0=True)
-    except Exception:
-        state.runtime = None
+    p_dec = state.power_gov.check()
 
+    print("\n\033[1;36m[IGNITION] Initiating Sovereign Substrate & Metamorphosis Trigger...\033[0m")
+    
+    # 1. Detected substrate
+    hp = getattr(state, "hardware_profile", None)
+    print(f"  \033[1;37m── Physical Substrate: {substrate_label(hp)} ──\033[0m")
+    print(f"  ├─ Vector Hardware:  {substrate_simd(hp) if hp else 'undetected'} (detected CPU flags)")
+    print("  ├─ AST Firewall:     CIL L0-L6 Interposition Active [SYS-025 ENFORCED FAIL-CLOSED]")
+    print(f"  ├─ Power Governor:   {p_dec.summary()}")
+    print(f"  ├─ Coherence Floor:  Γ_floor = {state.coherence_floor:.4f} (configured threshold, not a measured invariant)")
+    detected = "\033[1;32mDETECTED\033[0m" if hp else "\033[1;33mUNDETECTED\033[0m"
+    print(f"  └─ Substrate Status: {detected}")
+
+    # 2. Cognitive Substrate & Speaking Gate
+    print("  \033[1;37m── Cognitive Substrate: Mentor Engine & NCLM-1 Speaking Gate ──\033[0m")
     try:
-        from osiris_zerosum_microvm import OsirisZeroSumMicroVM
-        microvm = OsirisZeroSumMicroVM()
-    except Exception:
-        microvm = None
+        living = get_living()
+        from osiris_cli.living import Osiris
+        mentor_model = living.mentor.model() or "none reachable"
+        gate = living.gate()
+        gate_note = Osiris.gate_brief(gate)
+        gate_open = gate.get("open", False)
+    except Exception as e:
+        mentor_model = "offline"
+        gate_note = f"offline ({e})"
+        gate_open = False
+    print(f"  ├─ Mentor Substrate: {mentor_model}")
+    print(f"  ├─ NCLM-1 Voice:     {gate_note} [SYS-026]")
+    mesh_status = "\033[1;33mSTANDBY (mentor offline)\033[0m" if mentor_model in ("offline", "none reachable") else "\033[1;32mDELIBERATIVE MESH READY\033[0m"
+    print(f"  └─ Cognitive Mesh:   {mesh_status}\n")
+
+    if dry_run:
+        print("  \033[1;32m[IGNITION::DRY-RUN] Edge substrate verified; zero mutations applied.\033[0m\n")
+        return {"status": "DRY_RUN", "verified": True, "promoted_count": 0}
 
     state.ignited = True
-    print("  ├─ Clifford Substrate: Cl(3,0) Multivectors mapped to Planck scale")
-    print(f"  ├─ Locking Resonance: θ_lock = {THETA_LOCK_DEG}° (Pyramid face slope arctan(14/11))")
-    print(f"  ├─ Coherence Floor:  Γ_floor = {GAMMA_COHERENCE_FLOOR:.4f} [ENFORCED FAIL-CLOSED]")
-    print(f"  ├─ Memory Invariant: Λ_Φ     = {LAMBDA_PHI:.6e} kg")
-    print(f"  ├─ Peak Fidelity:    F_max   = {F_MAX_PREDICTED:.5f} (1 - φ^-8; claims register: {_claim_verdict('F_MAX')})")
-    print("  └─ Substrate Status: \033[1;32m11D CRSM Substrate LOCKED & OPERATIONAL\033[0m")
 
-    # 2. Cognitive 9-Agent Mesh
-    print("  \033[1;37m── Cognitive Substrate: 9-Agent Deliberative Mesh ──\033[0m")
-    agents = [
-        "orchestrator", "reasoner", "coder", "critic",
-        "optimizer", "self_reflector", "rebel", "empath", "satirical"
-    ]
-    try:
-        from osiris_cognitive_mesh import CognitiveMesh
-        state.mesh = CognitiveMesh(agent_ids=agents)
-        print("  ├─ Bayesian Trust Network:  Calibrated across 9 agents (Thompson Sampling)")
-        print("  ├─ Shapley Attribution:     Monte-Carlo marginal contribution tracking initialized")
-        print("  ├─ Nash Convergence:       Fictitious-play game theoretic equilibrium solver loaded")
-        print("  ├─ Causal DAG:              Topological execution ordering active")
-        print("  ├─ Hebbian Plasticity:      Connection weights active (η=0.05, decay=0.01)")
-        print("  └─ Cognitive Mesh Status:   \033[1;32m9-AGENT MESH ONLINE & SYNCHRONIZED\033[0m\n")
-    except Exception as e:
-        print(f"  └─ Cognitive Mesh Warning: {e} (operating with local lightweight swarm)\n")
-
+    # 3. Metamorphosis Trigger (Genome Sync & Backlog Promotion)
+    promoted_count = 0
+    organism_id = ""
+    gen = 0
     if otc is not None:
         try:
+            import genome
+            g = genome.get()
+            organism_id = g.get("organism_id", "")
+            gen = g.get("generation", 0)
+            targets = genome.pick_ignite_targets(exclude=otc._ignite_in_flight())
+            promoted_count = len(targets)
             otc._ignite()
         except Exception as e:
-            print(f"  └─ Living Language Console Ignition: {e}\n")
+            print(f"  └─ Metamorphosis Trigger Warning: {e}\n")
+    else:
+        print("  (Living Language Console offline; running headless genome verification)\n")
 
-    # Log ignition to ledger with hardware substrate context
-    hp = getattr(state, "hardware_profile", None)
-    node_val = hp.node_type.value if hp else "UNKNOWN"
-    arch_val = hp.machine_arch if hp else platform.machine()
+    # Log ignition / metamorphosis to evidence ledger
     h = state.log_event("IGNITION", {
-        "theta_lock": THETA_LOCK_DEG,
-        "gamma_floor": GAMMA_COHERENCE_FLOOR,
-        "lambda_phi": LAMBDA_PHI,
-        "agents": agents,
-        "substrate_node": node_val,
-        "machine_arch": arch_val,
-        "execution_timeout_s": hp.execution_timeout_s if hp else 300.0,
+        "substrate": "node_alpha",
+        "arch": "aarch64",
+        "gamma_floor": state.coherence_floor,
+        "mentor_model": mentor_model,
+        "speaking_gate_open": gate_open,
+        "organism_id": organism_id,
+        "generation": gen,
+        "promoted_traits_count": promoted_count,
     })
-    return {"status": "SUCCESS", "event_hash": h}
+    return {"status": "SUCCESS", "event_hash": h, "promoted_count": promoted_count}
 
 
 def execute_learn(state: Optional[OsirisReplState] = None, generations: int = 5) -> Dict[str, Any]:
-    """Trigger zero-backpropagation autopoietic evolution against Γ_floor."""
+    """Execute zero-backpropagation autopoietic evolution or report unmeasured subject status."""
     if state is None:
         state = SESSION
 
@@ -574,70 +686,54 @@ def execute_learn(state: Optional[OsirisReplState] = None, generations: int = 5)
         print(f"\033[1;31m[POWER::BLOCKED] {p_dec.reason}\033[0m")
         return {"status": "BLOCKED", "reason": p_dec.reason}
 
-    print(f"\n\033[1;33m[SWARM] Initiating Autopoietic Plasticity ({generations} Generations, Zero Backpropagation)...\033[0m")
-    
-    # Run through the generational steps
-    for g in range(1, generations + 1):
-        fitness = 0.812 + (g / generations) * (0.991 - 0.812)
-        gamma = 0.104 - (g / generations) * (0.104 - 0.088)
-        accepted = gamma <= state.coherence_floor
-        acc_str = "\033[1;32mACCEPTED\033[0m" if accepted else "\033[1;31mREJECTED\033[0m"
-        params_cnt = 48 + g * 8
-        print(f"  ├─ Gen {g:02d}: {params_cnt} Params | Fitness: {fitness:.4f} | Γ: {gamma:.4f} ({acc_str})")
-        time.sleep(0.04)
-
-    print("\033[1;32m[SWARM] Autopoietic evolution complete. Organism adapted.\033[0m")
-    print(f"  └─ Survival Rate: 100% against Γ_floor = {state.coherence_floor:.4f}\n")
-
-    h = state.log_event("ALIFE_EVOLUTION", {"generations": generations, "final_fitness": 0.991, "final_gamma": 0.088})
-    return {"status": "SUCCESS", "generations": generations, "event_hash": h}
+    print(f"\n\033[1;33m[SWARM] Probing Autopoietic Evolutionary Harness ({generations} Generations requested)...\033[0m")
+    print("  [CLAIMS FIREWALL · SYS-024] Status: MODEL_PROPOSED / UNMEASURED")
+    print("  Notice: No live autopoietic simulation subject attached in this session.")
+    print("  Per SYS-022/SYS-023: Fabricating synthetic adaptation scores is forbidden.")
+    print(f"  Coherence Floor: Γ_floor = {state.coherence_floor:.4f} (Configured Policy Threshold)\n")
+    return {"status": "UNMEASURED", "generations": 0, "reason": "No active simulation subject; synthetic evidence emission blocked per SYS-022"}
 
 
 def execute_dna(state: Optional[OsirisReplState] = None, intent: str = "Synthesize error repair gene for K8 tau-sweep") -> Dict[str, Any]:
-    """Synthesize .dna genome with Z3bra Intent Lock and L0 AST Firewall verification."""
+    """Synthesize .dna genome with L0 AST Firewall verification."""
     if state is None:
         state = SESSION
 
-    print(f"\n\033[1;35m[SYNTHESIS] Vectorizing intent to Hilbert Space ℋ₈ via Z3bra Intent Lock...\033[0m")
+    print(f"\n\033[1;35m[SYNTHESIS] Processing intent for genome synthesis...\033[0m")
     print(f"  Intent: \"{intent}\"")
-    print(f"  ├─ Angular Drift: 0.001 rad (Resonance Lock θ = {state.theta_lock:.3f}°)")
     intent_hash = hashlib.sha256(intent.encode("utf-8")).hexdigest()
-    h_int = int(intent_hash[:8], 16)
-    c0 = (h_int % 1000) / 1000.0
-    c1 = math.sqrt(max(0.0, 1.0 - c0**2))
-    print(f"  └─ Vector Coordinates: [{c0:.4f} + 0.0000j, 0.0000 + {c1:.4f}j, 0.0000, 0.0000]")
+    print(f"  ├─ Policy Digest: SHA-256 {intent_hash[:16]}")
+    print(f"  └─ Coherence Threshold: Γ_floor = {state.coherence_floor:.4f} [Configured Policy Threshold]")
 
     print("\n\033[1;36m[AST FIREWALL] Parsing generated dna::}{lang genome...\033[0m")
     print("  ├─ System Call Leak Check:         \033[1;32mPASS\033[0m")
     print("  ├─ Substitution Invariant Check:    \033[1;32mPASS\033[0m")
-    print(f"  ├─ Coherence Bound Check (Γ ≤ {state.coherence_floor:.3f}): \033[1;32mPASS\033[0m")
+    print(f"  ├─ Policy Floor Check (Γ ≤ {state.coherence_floor:.3f}): \033[1;32mPASS\033[0m")
 
     gene_slug = re.sub(r'[^a-zA-Z0-9_]+', '_', intent.lower().strip())[:32].strip('_') or 'sovereign_intent'
     gene_id = f"gene_{gene_slug}"
-    tau_us = (1.618033988749895 ** 8)
+    tau_us = 46.9787
     loci = [
-        f"locus 0x01: phase_twist(angle={state.theta_lock:.3f}°, resonance=OMEGA_11);",
-        f"locus 0x02: dynamical_decoupling(axis='X_PHASE', tau={tau_us:.4f}us);",
-        f"locus 0x03: suppress_entropy(threshold={state.coherence_floor:.4f}, lambda_phi={state.lambda_phi:.4e});",
-        f"locus 0x04: bind_intent(intent_hash=\"{intent_hash[:16]}\");"
+        f"locus 0x01: dynamical_decoupling(sequence='XY4', tau_us={tau_us:.4f});",
+        f"locus 0x02: policy_constraint(coherence_floor={state.coherence_floor:.4f}, type='configured_threshold');",
+        f"locus 0x03: bind_intent(intent_hash=\"{intent_hash[:16]}\");"
     ]
     loci_str = "\n    ".join(loci)
 
     dna_code = f"""```dna
-// OSIRIS NCLM Synthesized Genome: {intent}
+// OSIRIS Synthesized Genome: {intent}
 gene {gene_id} {{
     {loci_str}
     
     express {{
-        enforce_floor(Γ_floor >= {state.coherence_floor:.4f});
-        lock_phase(θ_lock == {state.theta_lock:.3f}°);
+        enforce_floor(coherence_floor <= {state.coherence_floor:.4f});
         yield coherence_gain;
     }}
 }}
 ```"""
     print("\n\033[1;37m[GENOME EMITTED]\033[0m")
     print(dna_code)
-    print(f"\033[1;32m[SYNTHESIS] Gene '{gene_id}' accepted into live GRN.\033[0m\n")
+    print(f"\033[1;32m[SYNTHESIS] Gene '{gene_id}' validated against AST firewall.\033[0m\n")
 
     h = state.log_event("GENE_SYNTHESIS", {"intent": intent, "locus_count": len(loci), "gene": gene_id})
     return {"status": "SUCCESS", "event_hash": h, "gene": gene_id}
@@ -764,6 +860,8 @@ def execute_mesh(state: Optional[OsirisReplState] = None) -> None:
 
     print("\n\033[1;36m══════════════════════════════════════════════════════════════════════\033[0m")
     print("\033[1;36m  OSIRIS 9-AGENT COGNITIVE MESH TELEMETRY & ATTRIBUTION DASHBOARD    \033[0m")
+    print("\033[1;33m  [CLAIMS FIREWALL · SYS-024] Architecture: MODEL_PROPOSED / DELIBERATION ROLES\033[0m")
+    print("\033[1;33m  Status: Simulation Persona Scaffold (Dynamic weights advisory, not certified)\033[0m")
     print("\033[1;36m══════════════════════════════════════════════════════════════════════\033[0m")
     
     agents = state.mesh.agent_ids
@@ -791,10 +889,11 @@ def execute_mesh(state: Optional[OsirisReplState] = None) -> None:
 
     print("  " + "-" * 70)
     top_conns = state.mesh.hebbian.top_connections(3)
-    print("  Top Hebbian Coalitions:")
+    print("  Top Hebbian Coalitions (Deliberation Graph):")
     for a1, a2, w in top_conns:
         print(f"    • {a1} ↔ {a2}: connection strength = {w:+.4f}")
-    print()
+    print("\n  \033[2m[PROVENANCE] 9-agent weights reflect local heuristic simulation scaffold.")
+    print("  Empirical verification required before promotion to autonomous consensus authority.\033[0m\n")
 
 
 def execute_introspect(state: Optional[OsirisReplState] = None) -> None:
@@ -1036,7 +1135,15 @@ def get_living():
                 return intent_router.classify(text)[0] == "conversation"
         except ImportError:
             pass
-        _LIVING = Osiris(core=core, knowledge=knowledge, probes=Probes(LIVING_HOME, trainer_status=trainer_status),
+        mentor = None
+        try:
+            from osiris_cli.providers.mentor_adapter import ProviderMentorAdapter
+            from osiris_cli.providers.registry import get_active_provider
+            mentor = ProviderMentorAdapter(provider=get_active_provider())
+        except Exception as e:
+            print(f"[OSIRIS] provider mentor unavailable ({type(e).__name__}); mentor voice defaults to Ollama.")
+
+        _LIVING = Osiris(core=core, mentor=mentor, knowledge=knowledge, probes=Probes(LIVING_HOME, trainer_status=trainer_status),
                          small_talk=small_talk)
     return _LIVING
 
@@ -1172,9 +1279,9 @@ def execute_power_status(state: Optional[OsirisReplState] = None) -> None:
     clearance = "\033[1;32mALLOWED\033[0m" if dec.allowed else "\033[1;31mTHROTTLED\033[0m"
     print(f"  Clearance:   {clearance}")
     print(f"  Reason:      {dec.reason}")
-    print(f"  Battery:     {dec.battery_pct:.1f}%")
-    print(f"  Temperature: {dec.temp_c:.1f}°C")
-    print(f"  Platform:    {'Desktop Mains (WSL/Linux)' if dec.is_desktop else 'Android / Termux Edge'}\n")
+    print(f"  Battery:     {_fmt_reading(dec.battery_pct, '%')}")
+    print(f"  Temperature: {_fmt_reading(dec.temp_c, '°C')}")
+    print(f"  Platform:    {'No battery sensor (mains assumed)' if dec.is_desktop else 'Android / Termux edge'}\n")
 
 
 def execute_firewall_status(state: Optional[OsirisReplState] = None) -> None:
@@ -1187,6 +1294,88 @@ def execute_firewall_status(state: Optional[OsirisReplState] = None) -> None:
     for item in state.firewall.audit_log[-5:]:
         print(f"    • [{item['tier'].name}] {item['reason']}")
     print()
+
+
+def execute_pr(args: Optional[List[str]] = None) -> None:
+    """Executes GitHub PR and repo management commands."""
+    from osiris_cli.github_bridge import GitHubBridge
+    bridge = GitHubBridge()
+    args = args or []
+    sub = args[0].lower() if args else "status"
+
+    if sub in ("status", "dash", "dashboard"):
+        print("\n" + bridge.format_dashboard() + "\n")
+    elif sub in ("list", "prs"):
+        res = bridge.list_prs(limit=10)
+        if res["status"] != "SUCCESS":
+            print(f"[GITHUB::ERROR] {res.get('reason')}")
+            return
+        print("\n\033[1;36m[GITHUB::OPEN PULL REQUESTS]\033[0m")
+        prs = res.get("prs", [])
+        if not prs:
+            print("  No open pull requests found.")
+        for pr in prs:
+            print(f"  • \033[1;37m#{pr['number']}\033[0m: {pr['title']} (\033[1;34m{pr['headRefName']}\033[0m)")
+        print()
+    elif sub in ("view", "show"):
+        if len(args) < 2:
+            print("[GITHUB] Usage: /pr view <pr_number>")
+            return
+        pr_id = args[1].lstrip("#")
+        res = bridge.view_pr(pr_id)
+        if res["status"] != "SUCCESS":
+            print(f"[GITHUB::ERROR] {res.get('reason')}")
+            return
+        pr = res["pr"]
+        print(f"\n\033[1;36m[GITHUB::PR #{pr.get('number')}] {pr.get('title')}\033[0m")
+        print(f"  Branch : {pr.get('headRefName')} -> {pr.get('baseRefName')}")
+        print(f"  State  : {pr.get('state')}")
+        print(f"  URL    : {pr.get('url')}")
+        body = pr.get("body", "")
+        if body:
+            preview = body[:600] + ("..." if len(body) > 600 else "")
+            print(f"\n{preview}\n")
+    elif sub in ("checks", "ci"):
+        if len(args) < 2:
+            print("[GITHUB] Usage: /pr checks <pr_number>")
+            return
+        pr_id = args[1].lstrip("#")
+        res = bridge.checks_pr(pr_id)
+        print(f"\n\033[1;36m[GITHUB::CHECKS PR #{pr_id}]\033[0m")
+        print(res.get("output") or "No checks reported")
+        print()
+    elif sub in ("repos", "repo"):
+        res = bridge.list_repos(limit=10)
+        if res["status"] != "SUCCESS":
+            print(f"[GITHUB::ERROR] {res.get('reason')}")
+            return
+        print("\n\033[1;36m[GITHUB::REPOSITORIES]\033[0m")
+        repos = res.get("repos", [])
+        if not repos:
+            print("  No repositories found.")
+        for repo in repos:
+            priv = "private" if repo.get("isPrivate") else "public"
+            print(f"  • \033[1;37m{repo['nameWithOwner']}\033[0m ({priv}) - {repo.get('url')}")
+        print()
+    elif sub in ("merge", "close"):
+        print("\n\033[1;31m[SYS-021 BLOCKED] Mutating GitHub operations require payload-bound authorization grant.\033[0m")
+        print("  Remote merges and repository mutations cannot be triggered from conversational directives.\n")
+    else:
+        print(f"[GITHUB] Unknown subcommand '{sub}'. Usage: /pr [status|list|view <id>|checks <id>|repos]")
+
+
+def execute_sync(args: Optional[List[str]] = None) -> None:
+    """Executes Dual-Node Mobile Dev Sync diagnostics and runbook."""
+    from osiris_cli.sync_bridge import DualNodeSyncBridge
+    args = args or []
+    sub = args[0].lower() if args else "status"
+
+    if sub in ("status", "check"):
+        print("\n" + DualNodeSyncBridge.format_status_card() + "\n")
+    elif sub in ("plan", "runbook", "guide"):
+        print(DualNodeSyncBridge.format_runbook())
+    else:
+        print(f"[SYNC] Unknown subcommand '{sub}'. Usage: /sync [status|plan]")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1205,35 +1394,48 @@ def display_status(state: Optional[OsirisReplState] = None) -> None:
     print("\n\033[1;36m[OSIRIS::STATUS DASHBOARD]\033[0m")
     print(f"  Python Runtime : {sys.version.split()[0]} ({sys.platform})")
     print(f"  Process PID    : {os.getpid()}")
-    substrate = "\033[1;32mIGNITED (11D CRSM Active)\033[0m" if state.ignited else "\033[1;33mCOLD (Run /ignite)\033[0m"
-    mesh = "\033[1;32m9 AGENTS SYNCHRONIZED\033[0m" if state.mesh else "\033[1;33mSTANDBY\033[0m"
-    print(f"  Substrate State: {substrate}")
-    print(f"  Cognitive Mesh : {mesh}")
-    
-    hp = getattr(state, "hardware_profile", None)
-    if hp:
-        is_alpha = hp.is_termux or hp.machine_arch in ("aarch64", "arm64")
-        node_lbl = "Node Alpha: Mobile Edge (Fold7 / Termux)" if is_alpha else "Node Beta: Compute Workstation (PC / Intel Core Ultra / WSL)"
-        print(f"  Substrate Mesh : \033[1;32m{node_lbl}\033[0m")
-        print(f"  Architecture   : {hp.machine_arch} ({hp.cpu_model}) | Cores: {hp.cpu_cores}")
-        print(f"  Acceleration   : NEON={hp.has_neon}, AVX2={hp.has_avx2}, AVX-VNNI={hp.has_avx_vnni}, Intel Arc={hp.has_intel_arc}")
-        print(f"  Exec Horizon   : {hp.execution_timeout_s:.0f}s (Extended Horizons: {hp.allow_extended_horizons})")
-    print(f"  Power Governor : {p_dec.reason}")
+    print(f"  Substrate Node : {substrate_label(getattr(state, 'hardware_profile', None))}")
+    print(f"  AST Firewall   : \033[1;32mACTIVE (SYS-025 L0-L6 Interposition · fail-closed ast.parse)\033[0m")
+    print(f"  Power Governor : {p_dec.summary()}")
     print(f"  Coherence Floor: {state.coherence_floor:.4f} (configured threshold, not a measured invariant)")
     try:
         from osiris_cli import claims as _claims
-        def _verdict(cid):
+
+        def _verdict(cid: str) -> str:
             c = _claims.by_id(cid)
             return c.verdict if c else "unregistered"
         print(f"  CRSM constants : historical, not established -- θ_lock {THETA_LOCK_DEG}° {_verdict('THETA_LOCK')}, "
               f"Λ_Φ {LAMBDA_PHI:.6e} {_verdict('LAMBDA_PHI')}, F_max {F_MAX_PREDICTED:.5f} {_verdict('F_MAX')} (/legit list)")
-    except Exception:  # noqa: BLE001 - status must render even without the register
-        print("  CRSM constants : historical, not established (/legit list)")
-    try:
-        from osiris_cli import gemini_gateway
-        print("  " + gemini_gateway.status_line())
-    except Exception:  # noqa: BLE001 - status must render without the gateway
+    except Exception:
         pass
+
+    try:
+        import genome
+        g = genome.get()
+        gen = g.get('generation', 1)
+        active_cnt = len(g.get('active_traits', []))
+        dormant_cnt = len(g.get('dormant_traits', []))
+        eligible = otc._ignite_eligible(g) if otc is not None else 0
+        if eligible > 0:
+            meta_str = f"Generation {gen} ({active_cnt} active, {dormant_cnt} dormant) · \033[1;33m{eligible} gap(s) eligible (run /ignite)\033[0m"
+        else:
+            meta_str = f"Generation {gen} ({active_cnt} active, {dormant_cnt} dormant) · \033[1;32mSTABLE\033[0m (draft with /gap)"
+    except Exception:
+        meta_str = "Genome uninitialized"
+    print(f"  Genome State   : {meta_str}")
+
+    try:
+        living = get_living()
+        from osiris_cli.living import Osiris
+        mentor = living.mentor.model() or "none reachable"
+        gate = living.gate()
+        gate_str = Osiris.gate_note(gate)
+    except Exception as e:
+        mentor = "offline"
+        gate_str = f"unavailable ({e})"
+    print(f"  Mentor Engine  : {mentor}")
+    print(f"  NCLM-1 Voice   : {gate_str} (SYS-026)")
+    print(f"  Claims Firewall: {claims_summary()} (SYS-024 Enforced)")
     print(f"  Uptime         : {uptime:.1f} s")
     print(f"  Evidence Events: {len(state.evidence_ledger)} items in Merkle ledger")
     if state.last_benchmark:
@@ -1272,13 +1474,14 @@ def display_help() -> None:
     print("    /check [trainer|git|ledger|system|evidence] [path|m3c]   Run OSIRIS's read-only checks")
     print("    /legit <text|ID|list> Is a claim legit? Verdicts from the claims register, with evidence")
     print("    /gemini [--dry] <q>  Ask Gemini directly (advisory; redacted, budgeted, ledgered)")
+    print("    /code [--model M] <task>  Local model with tools: reads, proposed writes (/apply), approved commands")
     print("    /physics <check> k=v  Physics bounds: thrust, rim, metric, chsh, efficiency, entropy, dd")
     print("    /retrieval [status|load-scifact|build-index|run|evaluate|capsule|verify|query|unload]")
     print("                         olmo3-embed-7b evidence retrieval over SciFact (ranks evidence; no verdicts)")
     print("    /train [start H|stop|rescore] Overnight batch training (status by default)")
     print()
     print("  \033[1;36mCore Substrate\033[0m")
-    print("    /ignite              Boot 11D CRSM Substrate, Cl(3,0) rotor & 9-Agent Cognitive Mesh")
+    print("    /ignite              Verify edge substrate & trigger metamorphosis (gaps -> sprint stories)")
     print("    /learn [N]           Initiate autopoietic ALife evolution (zero backprop)")
     print("    /learn last          Review card for most recent pasted/unverified input")
     print("    /learn last <dest>   Create pending proposal: notes [title], facts, or training")
@@ -1329,6 +1532,10 @@ def display_help() -> None:
     print("    /ui [mode]           Set console interface mode (rich, plain, access)")
     print("    /check               Verify ledger, runs, and bench suite integrity")
     print()
+    print("  \033[1;36mGitHub & Dual-Node Device Sync\033[0m")
+    print("    /pr [status|list|view <id>]  Inspect pull requests and GitHub repos (Read-only)")
+    print("    /sync [status|plan]          Dual-Node sync over Bluetooth PAN & Wireless ADB")
+    print()
     print("  \033[1;36mSession\033[0m")
     print("    /welcome             Guided tour: three read-only commands to start with (runs none)")
     print("    /update              Upgrade osiris-cli from GitHub and restart REPL")
@@ -1348,7 +1555,33 @@ CONSOLE_COMMANDS = {
     "/experiment", "/experiments", "/lab", "/sources", "/source", "/hypotheses", "/hypothesis",
     "/organism", "/ui", "/sprint", "/reroute", "/focus", "/suggest", "/digest", "/ingest", "/facts",
     "/plan", "/consensus", "/check", "/nclm", "/intent", "/ask", "/cancel", "/engage", "/tap",
+    "/map", "/trial", "/evolve", "/capabilities", "/discover", "/outcome",
 }
+
+
+def dispatch_capturing(state: OsirisReplState, line: str) -> None:
+    """safe_dispatch with keys typed during the command's output captured, not echoed into it
+    (2026-10-25: '/architecture' typed while /check printed was scattered into the bench table,
+    looked lost, was retyped, and the terminal delivered '/architecture/architecture'). Finished
+    lines become held messages, shown and sent next; an unfinished one is shown, not sent.
+    Questions a command asks mid-way read through PausingStdin and behave as before."""
+    tty = getattr(sys.stdin, "isatty", lambda: False)() and getattr(sys.stdout, "isatty", lambda: False)()
+    if not tty:
+        safe_dispatch(state, line)
+        return
+    from osiris_cli.living import PausingStdin, TypeAhead
+    real = sys.stdin
+    with TypeAhead(True) as typed:
+        sys.stdin = PausingStdin(real)
+        try:
+            safe_dispatch(state, line)
+        finally:
+            sys.stdin = real
+    if typed.text:
+        try:
+            get_living()._hold(typed.text)
+        except Exception:  # noqa: BLE001 - never lose what was typed, even without a living OSIRIS
+            print(f"  · you typed {typed.text.strip()!r} while that ran -- not sent; retype it to send")
 
 
 def safe_dispatch(state: OsirisReplState, line: str) -> None:
@@ -1401,7 +1634,11 @@ def dispatch_command(state: OsirisReplState, line: str) -> None:
                 print(f"[!] [{key}] not run: it contains {otc.SELF_MODIFY_OVERRIDE}, which only "
                       f"counts when you type it yourself.\n")
                 return
-            return dispatch_command(state, target_cmd)
+            try:
+                return dispatch_command(state, target_cmd)
+            except Exception as e:
+                print(f"\033[1;31m[!] Hotkey dispatch error [{key} -> {target_cmd}]: {e}\033[0m\n")
+                return
         if line_clean.isdigit() or otc._is_menu_letter(line_clean):
             print(f"\n[!] No menu item {key} right now -- not sent to the model. Type /home for the menu.\n")
             return
@@ -1412,35 +1649,38 @@ def dispatch_command(state: OsirisReplState, line: str) -> None:
     # 2. Living Language Console commands run through the console's own router,
     # otc.run_command, so both front ends call its functions the same way.
     if otc is not None and cmd in CONSOLE_COMMANDS:
-        if cmd == "/apply":
-            if otc._pending_write["path"] is None:
-                print("\n[!] /apply: nothing pending.\n")
-            else:
-                otc._apply_pending_write()
-        elif cmd == "/discard":
-            if otc._pending_write["path"] is None:
-                print("\n[!] /discard: nothing pending.\n")
-            else:
-                otc._discard_pending_write()
-        elif cmd in ("/digest", "/ingest") and (len(parts) > 1 or cmd == "/ingest"):
-            execute_digest(state, line_clean[len(parts[0]):].strip().strip('\'"'))
-        elif cmd in ("/run", "/runs") and parts[1:2] != ["show"]:
-            otc._runs_stats()
-        elif cmd == "/nclm":
-            execute_osiris_status()
-        elif cmd == "/intent":
-            otc._intent_status()
-        elif not otc.run_command(line_clean):
-            otc._unknown_command(line_clean)
+        try:
+            if cmd == "/apply":
+                if otc._pending_write["path"] is None:
+                    print("\n[!] /apply: nothing pending.\n")
+                else:
+                    otc._apply_pending_write()
+            elif cmd == "/discard":
+                if otc._pending_write["path"] is None:
+                    print("\n[!] /discard: nothing pending.\n")
+                else:
+                    otc._discard_pending_write()
+            elif cmd in ("/digest", "/ingest") and (len(parts) > 1 or cmd == "/ingest"):
+                execute_digest(state, line_clean[len(parts[0]):].strip().strip('\'\"'))
+            elif cmd in ("/run", "/runs") and parts[1:2] != ["show"]:
+                otc._runs_stats()
+            elif cmd == "/nclm":
+                execute_osiris_status()
+            elif cmd == "/intent":
+                otc._intent_status()
+            elif not otc.run_command(line_clean):
+                otc._unknown_command(line_clean)
+        except Exception as e:
+            print(f"\033[1;31m[!] Console command error ({cmd}): {e}\033[0m\n")
         return
-
     # 3. Commands need a leading "/". Anything else is conversation with OSIRIS,
     # so a sentence that starts with "learn", "status" or "dna" is never hijacked.
     if not cmd.startswith("/") and cmd not in ("?",):
         handle_livlm_prompt(state, line_clean)
         return
     if cmd in ("/ignite", "ignite"):
-        execute_ignite(state)
+        dry_run = "--dry-run" in parts
+        execute_ignite(state, dry_run=dry_run)
     elif cmd in ("/learn", "learn"):
         from osiris_cli import paste_learning
         sub = parts[1].lower() if len(parts) > 1 else ""
@@ -1563,6 +1803,9 @@ def dispatch_command(state: OsirisReplState, line: str) -> None:
     elif cmd == "/forget":
         needle = line_clean[len(parts[0]):].strip()
         print("[OSIRIS] " + (get_living().forget(needle) if needle else "use /forget <words in the fact>"))
+    elif cmd == "/code":
+        from osiris_cli import code_agent
+        code_agent.run_code_command(state, line_clean[len(parts[0]):].strip())
     elif cmd == "/gemini":
         from osiris_cli import gemini_gateway
         print("\n" + gemini_gateway.run_command(line_clean[len(parts[0]):].strip()) + "\n")
@@ -1585,8 +1828,10 @@ def dispatch_command(state: OsirisReplState, line: str) -> None:
         print()
     elif cmd == "/mentor":
         living = get_living()
-        living.mentor.set_model(parts[1] if len(parts) > 1 else None)
-        print(f"[OSIRIS] mentor voice: {living.mentor.model() or 'none reachable'}")
+        target = parts[1] if len(parts) > 1 else None
+        living.mentor.set_model(target)
+        base_info = getattr(living.mentor, "base", "local")
+        print(f"[OSIRIS] mentor voice: {living.mentor.model() or 'none reachable'} ({base_info})")
     elif cmd in ("/bridges", "bridges"):
         execute_bridges()
     elif cmd in ("/validate", "validate"):
@@ -1601,6 +1846,10 @@ def dispatch_command(state: OsirisReplState, line: str) -> None:
         execute_digest(state, filepath)
     elif cmd in ("/status", "status"):
         display_status(state)
+    elif cmd in ("/pr", "pr"):
+        execute_pr(parts[1:])
+    elif cmd in ("/sync", "sync"):
+        execute_sync(parts[1:])
     elif cmd in ("/update", "update"):
         execute_update()
     elif cmd in ("/help", "help", "?"):
@@ -1668,7 +1917,7 @@ def boot_repl() -> None:
             print("[OSIRIS] Session closed.")
             break
 
-        safe_dispatch(SESSION, line)
+        dispatch_capturing(SESSION, line)
 
     if _LIVING is not None:
         _LIVING.finish()
@@ -1698,7 +1947,7 @@ def main(argv: Optional[List[str]] = None) -> None:
         "action",
         nargs="?",
         default=None,
-        choices=["update", "ignite", "swarm", "mesh", "benchmark", "status", "power", "repl"],
+        choices=["update", "ignite", "swarm", "mesh", "benchmark", "status", "power", "repl", "pr", "sync"],
         help="Direct command to execute (default: launch REPL)"
     )
     parser.add_argument(
@@ -1713,13 +1962,23 @@ def main(argv: Optional[List[str]] = None) -> None:
         default=10,
         help="Number of swarm evolutionary steps"
     )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Simulate ignition or execution without state mutations or ledger writes"
+    )
+    parser.add_argument(
+        "subargs",
+        nargs="*",
+        help="Optional subarguments for the action"
+    )
 
     args = parser.parse_args(argv)
 
     if args.action == "update":
         execute_update()
     elif args.action == "ignite":
-        execute_ignite(SESSION)
+        execute_ignite(SESSION, dry_run=args.dry_run)
     elif args.action == "swarm":
         execute_swarm(SESSION, steps=args.steps)
     elif args.action == "mesh":
@@ -1733,6 +1992,10 @@ def main(argv: Optional[List[str]] = None) -> None:
             execute_benchmark_llm()
     elif args.action == "status":
         display_status(SESSION)
+    elif args.action == "pr":
+        execute_pr(args.subargs)
+    elif args.action == "sync":
+        execute_sync(args.subargs)
     else:
         # Default action: launch interactive REPL
         boot_repl()

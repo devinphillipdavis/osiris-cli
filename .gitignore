@@ -51,4 +51,5 @@ venv312/
 
 # Untracked sub-clones
 repos/
+.osiris_env*
 

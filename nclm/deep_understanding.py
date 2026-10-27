@@ -1,18 +1,16 @@
-import random; random.seed(0)
-import random
-import sympy as sp
 # nclm/deep_understanding.py
-import asyncio
 import logging
-from typing import Dict, List, Optional, Tuple, Any
+import random
+from typing import Dict, List, Tuple
 from dataclasses import dataclass
 import time
 import json
 from pathlib import Path
 import networkx as nx
-import matplotlib.pyplot as plt
-from .quantum_cognitive import QuantumCognitiveProcessor, QuantumConcept
-from .enhanced_config import NCLMMode
+from .quantum_cognitive import QuantumCognitiveProcessor
+
+# Seeds the process-wide RNG on import (behavior kept as found).
+random.seed(0)
 
 logger = logging.getLogger(__name__)
 
@@ -129,7 +127,8 @@ class DeepUnderstandingProcessor:
         concepts = self._extract_concepts_from_prompt(prompt if isinstance(prompt,str) else str(prompt))
 
         # Initialize quantum processor with these concepts
-        print("QP TYPE:",type(self.quantum_processor)); self.quantum_processor.initialize_concepts(self.quantum_processor_input if hasattr(self,"quantum_processor_input") else concepts)
+        print("QP TYPE:",type(self.quantum_processor))
+        self.quantum_processor.initialize_concepts(self.quantum_processor_input if hasattr(self,"quantum_processor_input") else concepts)
 
         # Create entanglements based on semantic relationships
         for i, concept1 in enumerate(concepts):
@@ -203,8 +202,10 @@ class DeepUnderstandingProcessor:
         return layer
 
     def _extract_concepts_from_prompt(self, prompt):
-        if isinstance(prompt, dict): return ["metric perturbation","spacetime","tensor","h_tt","general relativity"]
-        if isinstance(prompt, str): return [w for w in prompt.split() if len(w) > 3]
+        if isinstance(prompt, dict):
+            return ["metric perturbation","spacetime","tensor","h_tt","general relativity"]
+        if isinstance(prompt, str):
+            return [w for w in prompt.split() if len(w) > 3]
         return []
         """Extract key concepts from a prompt (simplified for this example)"""
         # In a real implementation, this would use NLP techniques
@@ -290,7 +291,7 @@ class DeepUnderstandingProcessor:
             # Combine metrics
             coherence = (clustering * 0.6) + (efficiency * 0.4)
             return min(1.0, max(0.0, coherence))
-        except:
+        except Exception:
             return 0.5  # Default if calculation fails
 
     def _calculate_consciousness(self) -> float:
@@ -314,7 +315,7 @@ class DeepUnderstandingProcessor:
             # Combine metrics (simplified version of Integrated Information Theory)
             consciousness = (integration * 0.7) + (differentiation * 0.3)
             return min(1.0, max(0.0, consciousness))
-        except:
+        except Exception:
             return 0.6  # Default if calculation fails
 
     def _update_understanding_metrics(self) -> None:

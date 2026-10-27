@@ -16,15 +16,13 @@ All discoveries grounded in synthesized research corpus.
 from __future__ import annotations
 
 import json
-import os
 import time
 import hashlib
 import random
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Dict, List, Tuple, Optional, Any
+from typing import Dict, List
 from pathlib import Path
-import math
 import logging
 
 logger = logging.getLogger(__name__)
@@ -240,13 +238,13 @@ class PhysicsDiscoveryEngine:
     ) -> TheoryProposal:
         """
         Generate a novel physics theory through iterative synthesis.
-        
+
         Args:
             seed_topic: Initial research direction
             research_papers: List of papers to synthesize from
             num_principles: Number of fundamental principles to synthesize
             iterations: Number of refinement passes
-        
+
         Returns:
             TheoryProposal: Complete exotic physics theory
         """

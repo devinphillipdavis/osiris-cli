@@ -425,8 +425,9 @@ osiris retrieval query "statins lower the risk of heart attack"
   bipartite-staggered DD kept P(+) = 0.900 at 32 µs versus 0.834 for simultaneous DD and 0.595
   idle (non-overlapping 95 % CIs; job `dau0q3qhcrkc73durtgg`; data in
   `experiments/osiris_advantage_marrakesh/`; Zenodo
-  [10.5281/zenodo.23045494](https://doi.org/10.5281/zenodo.23045494)). This is a
-  crosstalk-suppression result for a known technique family, not a quantum-advantage claim.
+- **The Quantum Ultimatum: Engineering Spacetime with DNA-Lang** — Devin Phillip Davis,
+  IBM Community Research & Technical Discussions. Available at:
+  [https://community.ibm.com/community/user/discussion/the-quantum-ultimatum-engineering-spacetime-with-dna-lang](https://community.ibm.com/community/user/discussion/the-quantum-ultimatum-engineering-spacetime-with-dna-lang).
 
 ## What this repository also contains
 
