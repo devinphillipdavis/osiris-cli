@@ -1444,21 +1444,58 @@ def display_status(state: Optional[OsirisReplState] = None) -> None:
 
 
 def execute_update() -> None:
-    """Executes pip upgrade from git and restarts the REPL via os.execvp."""
-    print("\033[1;36m[OSIRIS::SYNC] Pulling latest Sovereign Architecture from git...\033[0m")
-    repo_url = "git+https://github.com/osiris-dnalang/osiris-cli.git"
-    cmd = [sys.executable, "-m", "pip", "install", "--upgrade", repo_url]
+    """Brings osiris-cli up to date and restarts the REPL via os.execvp.
 
-    try:
-        res = subprocess.run(cmd, check=True)
-        if res.returncode == 0:
-            print("\033[1;32m[OSIRIS::SYNC] Upgrade successful. Re-executing process image...\033[0m")
-            time.sleep(0.5)
-            os.execvp(sys.executable, [sys.executable] + sys.argv)
-        else:
-            print(f"[OSIRIS::ERROR] Upgrade exited with status {res.returncode}")
-    except Exception as e:
-        print(f"[OSIRIS::ERROR] Upgrade failed: {e}")
+    Run from a git checkout (an editable install), it fast-forwards the checkout to origin/main and never
+    pip-installs over it: on 2026-10-27 a wheel installed over the editable checkout left a second, newer copy of
+    every module in site-packages, imported instead whenever PYTHONPATH was not set, while the console kept
+    running the checkout's older code."""
+    print("\033[1;36m[OSIRIS::SYNC] Pulling latest Sovereign Architecture from git...\033[0m")
+    repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    if os.path.exists(os.path.join(repo, ".git")):
+        updated = update_checkout(repo)
+    else:
+        repo_url = "git+https://github.com/osiris-dnalang/osiris-cli.git"
+        cmd = [sys.executable, "-m", "pip", "install", "--upgrade", repo_url]
+        try:
+            updated = subprocess.run(cmd, check=True).returncode == 0
+        except Exception as e:
+            print(f"[OSIRIS::ERROR] Upgrade failed: {e}")
+            updated = False
+    if updated:
+        print("\033[1;32m[OSIRIS::SYNC] Upgrade successful. Re-executing process image...\033[0m")
+        time.sleep(0.5)
+        os.execvp(sys.executable, [sys.executable] + sys.argv)
+
+
+def update_checkout(repo: str, run: Callable = subprocess.run) -> bool:
+    """Fast-forward a git checkout to origin/main. True only when it moved; anything a fast-forward cannot do
+    safely (uncommitted changes, local commits) is reported and left alone."""
+    def git(*args):
+        return run(["git", "-C", repo, *args], capture_output=True, text=True)
+
+    if git("status", "--porcelain", "--untracked-files=no").stdout.strip():
+        print(f"[OSIRIS::SYNC] not updated: {repo} has uncommitted changes")
+        return False
+    fetched = git("fetch", "origin")
+    if fetched.returncode:
+        print(f"[OSIRIS::ERROR] git fetch failed: {(fetched.stderr or '').strip()[:200]}")
+        return False
+    ahead, behind = (int(n) for n in git("rev-list", "--left-right", "--count", "HEAD...origin/main").stdout.split())
+    branch = git("branch", "--show-current").stdout.strip() or "HEAD"
+    if not behind:
+        print(f"[OSIRIS::SYNC] {branch} already has everything on origin/main")
+        return False
+    if ahead:
+        print(f"[OSIRIS::SYNC] not updated: {branch} has {ahead} commit(s) that origin/main does not, and is "
+              f"{behind} behind. Merge to combine them: git -C {repo} merge origin/main")
+        return False
+    merged = git("merge", "--ff-only", "origin/main")
+    if merged.returncode:
+        print(f"[OSIRIS::ERROR] fast-forward failed: {(merged.stderr or '').strip()[:200]}")
+        return False
+    print(f"[OSIRIS::SYNC] {branch} fast-forwarded by {behind} commit(s) to origin/main")
+    return True
 
 
 def display_help() -> None:
