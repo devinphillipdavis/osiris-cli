@@ -1,0 +1,148 @@
+{
+  "organism_id": "alpha_a_field_study",
+  "timestamp_utc": "2026-10-27T02:19:50.828303+00:00",
+  "epistemic_invariant": "A verified identity is not a verified interpretation; a verified interpretation is not a derived physical law; and a derived law is not an independently confirmed prediction until the relevant evidence exists.",
+  "level_1_identities": {
+    "reference_alpha": 0.007297352564341722,
+    "reciprocal_alpha": 137.03599917680663,
+    "identities": {
+      "expr_1_Z0_2RK": {
+        "value": 0.007297352564341724,
+        "abs_difference": 2.6020852139652106e-18,
+        "rel_difference": 3.5657934723891735e-16,
+        "pass": true
+      },
+      "expr_2_quarter_G0_Z0": {
+        "value": 0.007297352564341724,
+        "abs_difference": 2.6020852139652106e-18,
+        "rel_difference": 3.5657934723891735e-16,
+        "pass": true
+      },
+      "expr_3_eZ0_4Phi0": {
+        "value": 0.007297352564341724,
+        "abs_difference": 2.6020852139652106e-18,
+        "rel_difference": 3.5657934723891735e-16,
+        "pass": true
+      },
+      "expr_4_hZ0_8Phi0_sq": {
+        "value": 0.007297352564341724,
+        "abs_difference": 2.6020852139652106e-18,
+        "rel_difference": 3.5657934723891735e-16,
+        "pass": true
+      }
+    },
+    "all_identities_pass": true,
+    "epistemic_standing": "ARTIFACT",
+    "standing_note": "Identities follow rigorously from definitions (Z_0, R_K, Phi_0, G_0); zero independent empirical novelty."
+  },
+  "dimensional_consistency": {
+    "dim_1_Z0_2RK": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "dim_2_quarter_G0_Z0": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "dim_3_eZ0_4Phi0": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "dim_4_hZ0_8Phi0_sq": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "all_expressions_dimensionless": true
+  },
+  "level_2_pairing_bookkeeping": {
+    "rule": "prefactor = (1/2) * (1/2)^n",
+    "cases": [
+      {
+        "representation": "R_K (charge e^2)",
+        "n": 0,
+        "computed_prefactor": 0.5,
+        "expected_prefactor": 0.5,
+        "matched": true
+      },
+      {
+        "representation": "G_0 (conductance 2e^2/h)",
+        "n": 1,
+        "computed_prefactor": 0.25,
+        "expected_prefactor": 0.25,
+        "matched": true
+      },
+      {
+        "representation": "Phi_0 (flux h/2e)",
+        "n": 1,
+        "computed_prefactor": 0.25,
+        "expected_prefactor": 0.25,
+        "matched": true
+      },
+      {
+        "representation": "Phi_0^2 (flux squared)",
+        "n": 2,
+        "computed_prefactor": 0.125,
+        "expected_prefactor": 0.125,
+        "matched": true
+      }
+    ],
+    "algebraic_rule_valid": true,
+    "epistemic_standing": "SUPPORTED_ALGEBRAIC_CONVENTION",
+    "boundary_warning": "Algebraic bookkeeping of factor of 2 degeneracy does NOT constitute evidence for an outgoing/returning physical field-pair."
+  },
+  "gates_evaluation": [
+    {
+      "gate_id": "GATE-01",
+      "name": "Symbolic & Numerical Identity Verification",
+      "verdict": "PASS",
+      "evidence": "4/4 identities verified at <1e-15 relative tolerance; dimensional consistency proven.",
+      "claims_unlocked": [
+        "ALPHA-CLAIM-001",
+        "ALPHA-CLAIM-002"
+      ]
+    },
+    {
+      "gate_id": "GATE-02",
+      "name": "Field-Pair Derivation from A-Field Equations",
+      "verdict": "BLOCKED",
+      "evidence": "No explicit derivation from Maxwell-Proca Lagrangian or retarded Green's functions submitted. Speculative interpretation quarantined.",
+      "quarantined_claims": [
+        "ALPHA-CLAIM-003"
+      ]
+    },
+    {
+      "gate_id": "GATE-03",
+      "name": "QED Scale Dependence (alpha(Q^2)) Recovery",
+      "verdict": "BLOCKED",
+      "evidence": "Paper treats alpha as a static vacuum quantity; running coupling alpha(Q^2) from vacuum polarization unaddressed.",
+      "quarantined_claims": [
+        "ALPHA-CLAIM-004"
+      ]
+    },
+    {
+      "gate_id": "GATE-04",
+      "name": "Independent Quantitative Prediction & Falsification",
+      "verdict": "BLOCKED",
+      "evidence": "Numerical value (~1/137) assumed via Z_0/R_K rather than derived ab initio. Falsification protocol untested.",
+      "quarantined_claims": [
+        "ALPHA-CLAIM-005",
+        "ALPHA-CLAIM-006"
+      ]
+    }
+  ],
+  "governance_status": {
+    "SYS_021_payload_bound": true,
+    "SYS_023_evidence_recorded": true,
+    "SYS_024_claims_firewall_enforced": true,
+    "overall_organism_state": "HERMETIC_CHECK_COMPLETE_GATES_2_4_BLOCKED"
+  },
+  "receipt_sha256": "be8114919fb66d80e49c73867eda10f3b85799ea6cd7efd0b3cd7090af88aae8"
+}

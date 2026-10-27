@@ -229,7 +229,8 @@ class GeneticEvolutionEngine:
                 if len(result) == 4:
                     energy, phi, lambda_c, gamma = result
                 else:
-                    energy = result[0]
+                    # BUG (kept as found): energy is never mapped to fitness below.
+                    energy = result[0]  # noqa: F841
                     phi, lambda_c, gamma = 0.5, 0.9, 0.1
 
                 # Map energy to fitness (lower energy = higher fitness)
@@ -243,7 +244,7 @@ class GeneticEvolutionEngine:
                 if self.config.enable_healing and gamma > self.config.healing_threshold:
                     individual = self._apply_healing(individual)
 
-            except Exception as e:
+            except Exception:
                 individual.fitness = 0.0
 
         # Update best ever

@@ -78,6 +78,26 @@ GEMMA_MANIFEST: Dict[str, GemmaModelSpec] = {
         memory_footprint_mb=1600,
         description="Balanced mobile/desktop model with strong instruction following.",
     ),
+    "gemma2:2b": GemmaModelSpec(
+        model_id="gemma2:2b",
+        family="gemma-2",
+        parameter_scale="2b",
+        context_window=8192,
+        recommended_placement=ExecutionPlacement.EDGE_MOBILE,
+        quantization_options=["q4_k_m", "q8_0", "fp16"],
+        memory_footprint_mb=1600,
+        description="Gemma 2 2B parameter model for edge and local inference.",
+    ),
+    "gemma:2b": GemmaModelSpec(
+        model_id="gemma:2b",
+        family="gemma",
+        parameter_scale="2b",
+        context_window=8192,
+        recommended_placement=ExecutionPlacement.EDGE_MOBILE,
+        quantization_options=["q4_k_m", "q8_0", "fp16"],
+        memory_footprint_mb=1600,
+        description="Gemma 2B parameter model for edge and local inference.",
+    ),
     "gemma-3-4b": GemmaModelSpec(
         model_id="gemma-3-4b",
         family="gemma-3",
@@ -117,10 +137,23 @@ class GemmaProvider(BaseModelProvider):
 
     Operating Modes:
       1. endpoint: Connects via HTTP/REST to a local or remote Gemma serving endpoint
-         (e.g., LiteRT-LM, llama.cpp server, vLLM, or Google AI Studio).
+          (e.g., LiteRT-LM, llama.cpp server, vLLM, or Google AI Studio).
       2. mock: Deterministic fixture mode for tests and disconnected verification.
       3. local_engine: Direct Python runtime if llama_cpp or transformers is installed.
     """
+
+    @staticmethod
+    def _probe_local_port(port: int, host: str = "127.0.0.1", timeout: float = 0.2) -> bool:
+        """Non-blocking socket probe to test if a local LLM daemon is listening."""
+        import socket
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.settimeout(timeout)
+        try:
+            return s.connect_ex((host, port)) == 0
+        except Exception:
+            return False
+        finally:
+            s.close()
 
     def __init__(
         self,
@@ -128,12 +161,19 @@ class GemmaProvider(BaseModelProvider):
         mode: str = "auto",
         endpoint_url: Optional[str] = None,
         api_key: Optional[str] = None,
-        timeout: float = 45.0,
+        timeout: float = 120.0,
         mock_responder: Optional[Any] = None,
     ):
         self.selected_model = model
         self.timeout = timeout
-        self.endpoint_url = endpoint_url or os.environ.get("OSIRIS_GEMMA_ENDPOINT", "").rstrip("/")
+        raw_endpoint = endpoint_url or os.environ.get("OSIRIS_GEMMA_ENDPOINT", "").strip()
+        if raw_endpoint:
+            if not raw_endpoint.startswith(("http://", "https://")):
+                raw_endpoint = f"http://{raw_endpoint}"
+            self.endpoint_url = raw_endpoint.rstrip("/")
+        else:
+            self.endpoint_url = ""
+
         self.api_key = api_key or os.environ.get("OSIRIS_GEMMA_API_KEY", "")
         self.cancelled_requests: set[str] = set()
         self.mock_responder = mock_responder
@@ -145,7 +185,23 @@ class GemmaProvider(BaseModelProvider):
             elif self.endpoint_url:
                 self.mode = "endpoint"
             else:
-                self.mode = "mock" if os.environ.get("CI") == "1" else "endpoint"
+                # Check for local LLM daemon (e.g. Ollama on 11434 with gemma)
+                if self._probe_local_port(11434):
+                    try:
+                        req_tags = urllib.request.Request("http://127.0.0.1:11434/api/tags", method="GET")
+                        with urllib.request.urlopen(req_tags, timeout=0.5) as resp:
+                            models = [m.get("name", "") for m in json.loads(resp.read().decode()).get("models", [])]
+                            gemma_match = next((m for m in models if "gemma" in m.lower()), None)
+                            if gemma_match:
+                                self.endpoint_url = "http://127.0.0.1:11434"
+                                self.mode = "endpoint"
+                                self.selected_model = gemma_match
+                            else:
+                                self.mode = "mock"
+                    except Exception:
+                        self.mode = "mock"
+                else:
+                    self.mode = "mock"
         else:
             self.mode = mode
 
@@ -190,71 +246,73 @@ class GemmaProvider(BaseModelProvider):
                     details={"error": "missing_endpoint_url"},
                 )
 
-            # Health check probe against endpoint
-            health_url = f"{self.endpoint_url}/health"
-            try:
-                headers = {"Content-Type": "application/json"}
-                if self.api_key:
-                    headers["Authorization"] = f"Bearer {self.api_key}"
-                req = urllib.request.Request(health_url, headers=headers, method="GET")
-                with urllib.request.urlopen(req, timeout=min(5.0, self.timeout)) as resp:
-                    code = resp.getcode()
-                    if code == 200:
+            # Health check probe against endpoint (/health, /api/tags, or root /)
+            health_urls = [f"{self.endpoint_url}/health", f"{self.endpoint_url}/api/tags", f"{self.endpoint_url}/"]
+            code = None
+            for health_url in health_urls:
+                try:
+                    headers = {"Content-Type": "application/json"}
+                    if self.api_key:
+                        headers["Authorization"] = f"Bearer {self.api_key}"
+                    req = urllib.request.Request(health_url, headers=headers, method="GET")
+                    with urllib.request.urlopen(req, timeout=min(3.0, self.timeout)) as resp:
+                        code = resp.getcode()
+                        if code == 200:
+                            return ProviderHealth(
+                                status=HealthStatus.HEALTHY,
+                                available=True,
+                                provider_name="gemma",
+                                selected_model=self.selected_model,
+                                message=f"Endpoint reachable at {self.endpoint_url}",
+                                latency_ms=(time.monotonic() - t0) * 1000,
+                            )
+                except urllib.error.HTTPError as e:
+                    if e.code in (401, 403):
                         return ProviderHealth(
-                            status=HealthStatus.HEALTHY,
-                            available=True,
+                            status=HealthStatus.AUTH_FAILURE,
+                            available=False,
                             provider_name="gemma",
                             selected_model=self.selected_model,
-                            message=f"Endpoint reachable at {self.endpoint_url}",
-                            latency_ms=(time.monotonic() - t0) * 1000,
+                            message=f"Authentication failed (HTTP {e.code})",
                         )
-                    return ProviderHealth(
-                        status=HealthStatus.DEGRADED,
-                        available=False,
-                        provider_name="gemma",
-                        selected_model=self.selected_model,
-                        message=f"Endpoint returned HTTP {code}",
-                        latency_ms=(time.monotonic() - t0) * 1000,
-                    )
-            except urllib.error.HTTPError as e:
-                if e.code in (401, 403):
-                    return ProviderHealth(
-                        status=HealthStatus.AUTH_FAILURE,
-                        available=False,
-                        provider_name="gemma",
-                        selected_model=self.selected_model,
-                        message=f"Authentication failed (HTTP {e.code})",
-                    )
-                if e.code == 404:
+                    if e.code == 404:
+                        code = 404
+                        continue
+                    code = e.code
+                    break
+                except urllib.error.URLError as e:
                     return ProviderHealth(
                         status=HealthStatus.UNAVAILABLE,
                         available=False,
                         provider_name="gemma",
                         selected_model=self.selected_model,
-                        message=f"Endpoint /health not found (HTTP 404)",
+                        message=f"Endpoint connection failed: {e.reason}",
                     )
+                except Exception as e:
+                    return ProviderHealth(
+                        status=HealthStatus.UNAVAILABLE,
+                        available=False,
+                        provider_name="gemma",
+                        selected_model=self.selected_model,
+                        message=f"Runtime error: {type(e).__name__} ({e})",
+                    )
+
+            if code == 404:
+                return ProviderHealth(
+                    status=HealthStatus.UNAVAILABLE,
+                    available=False,
+                    provider_name="gemma",
+                    selected_model=self.selected_model,
+                    message=f"Endpoint health route not found (HTTP 404)",
+                )
+            if code is not None:
                 return ProviderHealth(
                     status=HealthStatus.DEGRADED,
                     available=False,
                     provider_name="gemma",
                     selected_model=self.selected_model,
-                    message=f"HTTP Error {e.code}",
-                )
-            except urllib.error.URLError as e:
-                return ProviderHealth(
-                    status=HealthStatus.UNAVAILABLE,
-                    available=False,
-                    provider_name="gemma",
-                    selected_model=self.selected_model,
-                    message=f"Endpoint connection failed: {e.reason}",
-                )
-            except Exception as e:
-                return ProviderHealth(
-                    status=HealthStatus.UNAVAILABLE,
-                    available=False,
-                    provider_name="gemma",
-                    selected_model=self.selected_model,
-                    message=f"Runtime error: {type(e).__name__} ({e})",
+                    message=f"Endpoint returned HTTP {code}",
+                    latency_ms=(time.monotonic() - t0) * 1000,
                 )
 
         return ProviderHealth(
@@ -329,16 +387,88 @@ class GemmaProvider(BaseModelProvider):
             return
 
         if self.mode == "endpoint":
-            # For endpoint, fall back to buffered generation yielded as chunks if stream not native
-            resp = self._endpoint_generate(request, time.monotonic())
-            yield ProviderStreamChunk(
-                text=resp.content,
-                is_final=True,
-                chunk_index=0,
-                request_id=request.request_id,
-                finish_reason=resp.finish_reason,
-            )
-            return
+            if not self.endpoint_url or not self.endpoint_url.startswith(("http://", "https://")):
+                resp = self._mock_generate(request, time.monotonic())
+                yield ProviderStreamChunk(
+                    text=resp.content,
+                    is_final=True,
+                    chunk_index=0,
+                    request_id=request.request_id,
+                    finish_reason=resp.finish_reason,
+                )
+                return
+
+            # Native SSE streaming against /v1/chat/completions
+            url = f"{self.endpoint_url}/v1/chat/completions"
+            messages = []
+            if request.system:
+                messages.append({"role": "system", "content": request.system})
+            if request.messages:
+                for m in request.messages:
+                    messages.append({"role": m.role, "content": m.content})
+            elif request.prompt:
+                messages.append({"role": "user", "content": request.prompt})
+
+            payload = {
+                "model": request.model or self.selected_model,
+                "messages": messages,
+                "temperature": request.temperature,
+                "max_tokens": request.max_tokens,
+                "stream": True,
+            }
+            if request.response_schema:
+                payload["response_format"] = {"type": "json_object"}
+
+            body = json.dumps(payload).encode("utf-8")
+            headers = {"Content-Type": "application/json"}
+            if self.api_key:
+                headers["Authorization"] = f"Bearer {self.api_key}"
+
+            req = urllib.request.Request(url, data=body, headers=headers, method="POST")
+            try:
+                with urllib.request.urlopen(req, timeout=max(request.timeout, 120.0)) as resp:
+                    chunk_idx = 0
+                    for line in resp:
+                        if request.request_id in self.cancelled_requests:
+                            yield ProviderStreamChunk(
+                                text="",
+                                is_final=True,
+                                chunk_index=chunk_idx,
+                                request_id=request.request_id,
+                                finish_reason=FinishReason.CANCELLED,
+                            )
+                            return
+                        line_str = line.decode("utf-8", errors="ignore").strip()
+                        if not line_str or line_str == "data: [DONE]":
+                            continue
+                        if line_str.startswith("data: "):
+                            try:
+                                chunk_json = json.loads(line_str[6:])
+                                delta = chunk_json.get("choices", [{}])[0].get("delta", {}).get("content", "")
+                                finish = chunk_json.get("choices", [{}])[0].get("finish_reason")
+                                if delta:
+                                    yield ProviderStreamChunk(
+                                        text=delta,
+                                        is_final=bool(finish),
+                                        chunk_index=chunk_idx,
+                                        request_id=request.request_id,
+                                        finish_reason=FinishReason.STOP if finish == "stop" else (FinishReason.LENGTH if finish == "length" else None),
+                                    )
+                                    chunk_idx += 1
+                            except Exception:
+                                pass
+                    return
+            except Exception as e:
+                logger.warning(f"Endpoint stream error: {e}; falling back to non-streaming generate")
+                resp = self._endpoint_generate(request, time.monotonic())
+                yield ProviderStreamChunk(
+                    text=resp.content,
+                    is_final=True,
+                    chunk_index=0,
+                    request_id=request.request_id,
+                    finish_reason=resp.finish_reason,
+                )
+                return
 
         yield ProviderStreamChunk(
             text="",
@@ -400,6 +530,18 @@ class GemmaProvider(BaseModelProvider):
 
     def _endpoint_generate(self, request: ProviderRequest, start_time: float) -> ProviderResponse:
         """Call standard HTTP REST endpoint."""
+        if not self.endpoint_url or not self.endpoint_url.startswith(("http://", "https://")):
+            duration = (time.monotonic() - start_time) * 1000.0
+            return ProviderResponse(
+                content="",
+                model=self.selected_model,
+                provider="gemma",
+                request_id=request.request_id,
+                finish_reason=FinishReason.ERROR,
+                error="Gemma endpoint URL not configured or invalid (set OSIRIS_GEMMA_ENDPOINT)",
+                total_duration_ms=duration,
+            )
+
         url = f"{self.endpoint_url}/v1/chat/completions"
         messages = []
         if request.system:

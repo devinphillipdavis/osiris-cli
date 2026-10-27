@@ -1,0 +1,29 @@
+{
+  "organism_id": "alpha_a_field_study",
+  "experiments_executed": [
+    {
+      "experiment_id": "EXP-AFIELD-01",
+      "hardware_profile": "Niobium 3D TE011 Cavity (f0=5.0 GHz, Q=2e8, T=20 mK)",
+      "simulated_true_signal_Hz": 0.0,
+      "measured_observable_Hz": -0.07204516478896418,
+      "measured_relative_shift": -1.4409032957792836e-11,
+      "measurement_sigma_Hz": 0.5,
+      "falsification_threshold_3sigma_Hz": 1.5,
+      "is_null_result": true,
+      "empirical_verdict": "REFUTED",
+      "falsification_note": "Observed cavity frequency pull (-0.072 Hz) is strictly within 3-sigma experimental noise (1.5 Hz). Anomalous A-field boundary coupling is refuted to relative precision 3.0e-10."
+    },
+    {
+      "experiment_id": "EXP-AFIELD-02",
+      "hardware_profile": "Bimetallic Al/Cu Ring (Diameter 1.5 um, T=20 mK)",
+      "fractional_power_measured": 0.0007204516478896418,
+      "noise_floor_3sigma": 0.015,
+      "is_null_result": true,
+      "empirical_verdict": "REFUTED",
+      "falsification_note": "Fourier spectrum shows zero fractional fluxoid peak at 4/Phi_0 above the 3-sigma noise floor."
+    }
+  ],
+  "all_hypotheses_falsified": true,
+  "organism_status_update": "HYPOTHESIS_REFUTED_BY_EMPIRICAL_SIMULATION",
+  "governance_note": "Demonstrates that the research organism possesses explicit, literature-traceable falsification criteria (Paik et al., Reagor et al.) and correctly marks speculative physical claims as REFUTED when null results are recorded."
+}

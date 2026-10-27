@@ -7,7 +7,7 @@ under sovereign conditions.
 """
 
 from typing import Dict, Any, List
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 import time
 import hashlib
 import json

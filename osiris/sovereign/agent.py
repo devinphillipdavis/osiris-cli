@@ -6,7 +6,7 @@ import time
 from typing import Any, Dict, List, Optional
 from dataclasses import dataclass
 
-from .quantum_engine import AeternaPorta, LambdaPhiEngine, QuantumMetrics
+from .quantum_engine import AeternaPorta, LambdaPhiEngine
 
 
 @dataclass

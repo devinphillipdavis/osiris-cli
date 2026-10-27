@@ -1,7 +1,7 @@
 # nclm/quantum_cognitive.py
 import numpy as np
 import math
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List
 from dataclasses import dataclass
 import logging
 from enum import Enum
@@ -80,7 +80,6 @@ class QuantumCognitiveProcessor:
     def _apply_hadamard(self, qubit: int) -> Dict:
         """Apply Hadamard gate to create superposition"""
         if 0 <= qubit < self.dimensions:
-            H = np.array([[1, 1], [1, -1]], dtype=complex) / math.sqrt(2)
             # For simplicity, we'll just modify the state vector directly
             if qubit < len(self.state_vector):
                 # Create superposition

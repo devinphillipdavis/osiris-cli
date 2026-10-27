@@ -5,22 +5,19 @@ phase-conjugate substrate pipeline.
 
 import hashlib
 import json
-import math
-import os
 import zipfile
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 try:
-    import numpy as np
+    import numpy as np  # noqa: F401  (availability probe)
     _HAS_NUMPY = True
 except ImportError:
     _HAS_NUMPY = False
 
 try:
-    from osiris.defense.phase_conjugate import (
+    from osiris.defense.phase_conjugate import (  # noqa: F401  (availability probe)
         PhaseConjugateSubstratePreprocessor,
         PlanckConstants,
         UniversalConstants,
@@ -181,7 +178,6 @@ class WorkloadExtractor:
 
     def create_synthetic_job(self, backend_name: str = "ibm_brisbane",
                              shots: int = 8192, fidelity: float = 0.869) -> QuantumJobResult:
-        import random
         p_correlated = fidelity
         p_00 = p_correlated * 0.5
         p_11 = p_correlated - p_00

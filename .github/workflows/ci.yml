@@ -1,16 +1,20 @@
 name: OSIRIS CI
 
+# Actions on osiris-dnalang are billing-locked; branches pushed to the
+# devinphillipdavis/osiris-cli fork run CI there.
 on:
   push:
-    branches: [main]
+    branches: ['**']
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04  # 26.04 has no Python 3.9
     timeout-minutes: 30
     strategy:
+      fail-fast: false
       matrix:
         python-version: ["3.9", "3.10", "3.11", "3.12"]
 
@@ -55,7 +59,7 @@ jobs:
           /tmp/wv/bin/python -c "import osiris_cli, osiris_termux_console, protege, osiris_bench; print('console', osiris_cli.__version__); print('bench tasks', len(osiris_bench.load_tasks()))"
 
   lint:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04  # 26.04 has no Python 3.9
     steps:
       - uses: actions/checkout@v4
 

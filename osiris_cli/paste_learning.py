@@ -193,34 +193,21 @@ def get_proposals_path(living_home: str) -> str:
 
 def append_learning_ledger(living_home: str, action: str, details: Dict[str, Any]) -> str:
     """Appends an immutable SHA-256 hash-chained entry to learning_ledger.jsonl."""
-    ledger_path = get_learning_ledger_path(living_home)
-    prev_hash = "0" * 64
-    if os.path.exists(ledger_path):
-        try:
-            with open(ledger_path, "r", encoding="utf-8") as f:
-                lines = [line.strip() for line in f if line.strip()]
-                if lines:
-                    last_rec = json.loads(lines[-1])
-                    prev_hash = last_rec.get("hash", prev_hash)
-        except Exception:
-            pass
+    from osiris_cli import chain_lock
 
-    payload = {
-        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S"),
-        "epoch": time.time(),
-        "action": action,
-        "details": details,
-        "prev_hash": prev_hash
-    }
-    canon_bytes = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
-    entry_hash = hashlib.sha256(canon_bytes).hexdigest()
-    payload["hash"] = entry_hash
+    def build(last):
+        payload = {
+            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S"),
+            "epoch": time.time(),
+            "action": action,
+            "details": details,
+            "prev_hash": last["hash"] if last else "0" * 64,
+        }
+        canon_bytes = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        payload["hash"] = hashlib.sha256(canon_bytes).hexdigest()
+        return payload
 
-    os.makedirs(os.path.dirname(ledger_path), exist_ok=True)
-    with open(ledger_path, "a", encoding="utf-8") as f:
-        f.write(json.dumps(payload) + "\n")
-
-    return entry_hash
+    return chain_lock.append_chained(get_learning_ledger_path(living_home), build)["hash"]
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

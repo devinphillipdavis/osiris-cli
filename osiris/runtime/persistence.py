@@ -6,7 +6,6 @@ import hashlib
 import json
 import sqlite3
 import time
-from pathlib import Path
 from typing import Any, Dict, Optional
 
 

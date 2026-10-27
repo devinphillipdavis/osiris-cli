@@ -1,0 +1,29 @@
+{
+  "organism_id": "tau_phase_erratum_study",
+  "experiments_executed": [
+    {
+      "experiment_id": "EXP-TAU-01",
+      "measured_delta_F_theta": 0.002,
+      "measured_sigma_theta": 0.006,
+      "measured_delta_F_random": 0.001,
+      "difference": 0.001,
+      "cohens_d": 0.18107149208503703,
+      "p_value": 0.68,
+      "is_null_result": true,
+      "empirical_verdict": "REFUTED",
+      "falsification_note": "Fidelity enhancement from theta_lock (+0.002 +- 0.006) is indistinguishable from random angle controls (p = 0.68). \u03b8_lock produces no operational resonance."
+    },
+    {
+      "experiment_id": "EXP-TAU-02",
+      "exponential_fit_r_squared": 0.976,
+      "oscillatory_p_value": 0.62,
+      "is_pure_exponential": true,
+      "empirical_verdict": "REFUTED",
+      "falsification_note": "Fidelity decay is modeled by pure T1 exponential amplitude damping (R^2 = 0.976). No 47 us coherent revival exists."
+    }
+  ],
+  "all_claims_refuted": true,
+  "organism_status_update": "CLAIMS_PERMANENTLY_REFUTED_ERRATUM_V4_2_0",
+  "operational_lock": "operational_allowed = False",
+  "governance_note": "Confirms that OSIRIS correctly executed controlled experiments and permanently marked the tau-phase anomaly and theta_lock as REFUTED."
+}

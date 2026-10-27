@@ -10,6 +10,7 @@ import os
 
 if os.environ.get("OSIRIS_TEST_LIVE_OLLAMA") != "1":
     os.environ["OLLAMA_HOST"] = "http://127.0.0.1:9"      # discard port: connection refused at once
+    os.environ["OSIRIS_GEMMA_MOCK"] = "1"
 
 # Provide backward compatibility for fake Heron backend if not exported by runtime
 try:

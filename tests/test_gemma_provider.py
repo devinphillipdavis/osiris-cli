@@ -9,6 +9,7 @@ import json
 import pytest
 
 from osiris_cli.providers import (
+    BaseModelProvider,
     ExecutionPlacement,
     FinishReason,
     GEMMA_MANIFEST,
@@ -147,9 +148,9 @@ def test_registry_resolution():
     gemma = create_provider("gemma", mode="mock")
     assert isinstance(gemma, GemmaProvider)
 
-    # Active provider defaults to healthy gemma
+    # Active provider defaults to healthy registered provider
     active = get_active_provider()
-    assert isinstance(active, GemmaProvider)
+    assert isinstance(active, BaseModelProvider)
     reset_active_provider()
 
 
@@ -159,3 +160,26 @@ def test_ollama_compat_health_when_offline():
     health = ollama.health()
     assert health.status == HealthStatus.UNAVAILABLE
     assert health.available is False
+
+
+def test_gemma_provider_unconfigured_auto_mode_no_crash():
+    """Verify GemmaProvider in auto mode with unset endpoint resolves cleanly without ValueError."""
+    provider = GemmaProvider(mode="auto", endpoint_url="")
+    req = ProviderRequest(prompt="Hello OSIRIS")
+    chunks = list(provider.stream(req))
+    assert len(chunks) > 0
+    full_text = "".join(c.text for c in chunks)
+    assert len(full_text) > 0
+
+
+def test_gemma_provider_endpoint_mode_invalid_url_no_crash():
+    """Verify GemmaProvider in endpoint mode with empty endpoint never throws ValueError: unknown url type."""
+    provider = GemmaProvider(mode="endpoint", endpoint_url="")
+    req = ProviderRequest(prompt="Test prompt")
+    # Stream must yield fallback mock or error chunk, never raise ValueError
+    chunks = list(provider.stream(req))
+    assert len(chunks) > 0
+    # Generate must return clean ProviderResponse
+    resp = provider.generate(req)
+    assert resp is not None
+

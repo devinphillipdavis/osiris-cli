@@ -37,3 +37,38 @@ def test_command_safety_classification():
         is_read_only = cmd in READ_ONLY_COMMANDS
         # Every command must be classified either as read-only or as requiring state mutation handling
         assert isinstance(is_read_only, bool)
+
+
+def test_unknown_slash_command_fails_closed():
+    """Verify Rule 1: unknown commands starting with '/' fail closed and never reach LLM."""
+    import io
+    from unittest.mock import patch
+    from osiris_cli.osiris_repl import OsirisReplState, dispatch_command
+
+    state = OsirisReplState()
+    buf = io.StringIO()
+
+    with patch("sys.stdout", buf), patch("osiris_cli.osiris_repl.handle_livlm_prompt") as mock_llm:
+        dispatch_command(state, "/unrecognized_random_xyz")
+        # Must not call model
+        mock_llm.assert_not_called()
+
+    output = buf.getvalue()
+    assert "[!] Unknown command: '/unrecognized_random_xyz'" in output
+    assert "not sent to" in output and "model" in output
+
+
+def test_lab_commands_dispatch_to_otc():
+    """Verify that LAB_COMMANDS (/map, /sources, etc.) route directly to otc handlers."""
+    from unittest.mock import patch, MagicMock
+    from osiris_cli.osiris_repl import OsirisReplState, dispatch_command
+    import osiris_termux_console as otc
+
+    state = OsirisReplState()
+    with patch.dict(otc.LAB_COMMANDS, {"/map": MagicMock(), "/sources": MagicMock()}):
+        dispatch_command(state, "/map")
+        otc.LAB_COMMANDS["/map"].assert_called_once_with("/map")
+
+        dispatch_command(state, "/sources")
+        otc.LAB_COMMANDS["/sources"].assert_called_once_with("/sources")
+
