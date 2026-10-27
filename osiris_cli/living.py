@@ -1383,9 +1383,12 @@ class Osiris:
                f"{self._core_step()}; {self.stats['exchanges']} exchanges so far, "
                f"{self.stats['core_spoke']} answered by the core itself.")
         if gate["n"]:
+            # Spelled out: a mentor read "7.20 vs 4.80 for a unigram" as an improvement (2026-10-27).
+            side = "better" if gate["core_bpb"] < gate["unigram_bpb"] else "no better"
             return who + (f"\nYour core's current state: {gate['n']} held-out exchanges scored, "
                     f"{gate['core_bpb']:.2f} bits/byte vs {gate['unigram_bpb']:.2f} for a unigram "
-                    f"baseline; it speaks on its own at <= {SPEAK_BPB} bits/byte.")
+                    f"baseline. Lower is better, so the core does {side} than the baseline; it speaks on its "
+                    f"own at <= {SPEAK_BPB} bits/byte.")
         if gate.get("stale"):
             return who + (f"\nYour core's {gate['stale']} held-out scores come from an older scorer (before "
                           "v4.5.2's fix they measured a different network; scorer 2 read only the first two "
