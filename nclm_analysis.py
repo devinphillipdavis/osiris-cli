@@ -125,8 +125,9 @@ class LedgerAnalyzer:
             return []
 
     STATS_PATH = Path.home() / '.osiris' / 'living' / 'stats.json'
-    # osiris_cli.living.SCORER: scores without it (before v4.5.2) skipped a layer the core trains with
-    CURRENT_SCORER = 2
+    # osiris_cli.living.SCORER: older scores skipped a layer the core trains with (before v4.5.2) or covered
+    # only a reply's first two windows (scorer 2)
+    CURRENT_SCORER = 3
     stale_skipped = 0
 
     @classmethod
@@ -146,9 +147,9 @@ class LedgerAnalyzer:
         by_hash = {h: s for h, s in scored.items() if len(s) > 4 and s[4] == cls.CURRENT_SCORER}
         cls.stale_skipped = len(scored) - len(by_hash)
         if cls.stale_skipped:
-            logger.warning(f"{cls.stale_skipped} held-out scores predate the v4.5.2 scoring fix (they measured "
-                           "a network without the phase-conjugate corrector) and are left out; "
-                           "run `osiris train --rescore-only`")
+            logger.warning(f"{cls.stale_skipped} held-out scores predate scorer {cls.CURRENT_SCORER} (they measured "
+                           "a network without the phase-conjugate corrector, or only a reply's first two windows) "
+                           "and are left out; run `osiris train --rescore-only`")
 
         for i, exch in enumerate(exchanges):
             h = exch.get('hash') or ''

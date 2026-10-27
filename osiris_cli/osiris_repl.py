@@ -1135,7 +1135,15 @@ def get_living():
                 return intent_router.classify(text)[0] == "conversation"
         except ImportError:
             pass
-        _LIVING = Osiris(core=core, knowledge=knowledge, probes=Probes(LIVING_HOME, trainer_status=trainer_status),
+        mentor = None
+        try:
+            from osiris_cli.providers.mentor_adapter import ProviderMentorAdapter
+            from osiris_cli.providers.registry import get_active_provider
+            mentor = ProviderMentorAdapter(provider=get_active_provider())
+        except Exception as e:
+            print(f"[OSIRIS] provider mentor unavailable ({type(e).__name__}); mentor voice defaults to Ollama.")
+
+        _LIVING = Osiris(core=core, mentor=mentor, knowledge=knowledge, probes=Probes(LIVING_HOME, trainer_status=trainer_status),
                          small_talk=small_talk)
     return _LIVING
 
@@ -1470,7 +1478,7 @@ def display_help() -> None:
     print("    /physics <check> k=v  Physics bounds: thrust, rim, metric, chsh, efficiency, entropy, dd")
     print("    /retrieval [status|load-scifact|build-index|run|evaluate|capsule|verify|query|unload]")
     print("                         olmo3-embed-7b evidence retrieval over SciFact (ranks evidence; no verdicts)")
-    print("    /train [start H|stop|rescore] Overnight batch training (status by default)")
+    print("    /train [start H|stop|rescore|probe [freeze]] Overnight batch training (status by default)")
     print()
     print("  \033[1;36mCore Substrate\033[0m")
     print("    /ignite              Verify edge substrate & trigger metamorphosis (gaps -> sprint stories)")
@@ -1783,6 +1791,24 @@ def dispatch_command(state: OsirisReplState, line: str) -> None:
             else:
                 print("[OSIRIS] " + osiris_train.rescore_only(living.core, living.home, warn_open_chat=False))
                 living._save_stats()   # take the rescored entries into this session's gate
+        elif sub == "probe":
+            from osiris_cli import probeset
+            living = get_living()
+            if len(parts) > 2 and parts[2].lower() == "freeze":
+                try:
+                    info = probeset.freeze(living.home)
+                    print(f"[OSIRIS] froze {info['n']} held-out replies as the probe set "
+                          f"(sha256 {info['sha256'][:12]}): {info['path']}")
+                except (FileExistsError, ValueError) as e:
+                    print(f"[OSIRIS] not frozen: {e}")
+            elif probeset.load_set(living.home) is None:
+                print("[OSIRIS] no probe set yet: /train probe freeze")
+            elif living.core is None:
+                print("[OSIRIS] core unavailable")
+            else:
+                rows = probeset.score_pending(living.home, living.core.organism_dir(), log=print)
+                print(f"[OSIRIS] {len(rows)} milestone checkpoint(s) scored; "
+                      + (probeset.status_line(living.home) or "").strip())
         else:
             print("\n OSIRIS · batch training")
             for ln in osiris_train.status_lines(lock_path=lock):
@@ -1820,8 +1846,10 @@ def dispatch_command(state: OsirisReplState, line: str) -> None:
         print()
     elif cmd == "/mentor":
         living = get_living()
-        living.mentor.set_model(parts[1] if len(parts) > 1 else None)
-        print(f"[OSIRIS] mentor voice: {living.mentor.model() or 'none reachable'}")
+        target = parts[1] if len(parts) > 1 else None
+        living.mentor.set_model(target)
+        base_info = getattr(living.mentor, "base", "local")
+        print(f"[OSIRIS] mentor voice: {living.mentor.model() or 'none reachable'} ({base_info})")
     elif cmd in ("/bridges", "bridges"):
         execute_bridges()
     elif cmd in ("/validate", "validate"):
