@@ -32,6 +32,7 @@ from osiris.compiler.converter import OrganismConverter
 from osiris.compiler.dna_ir import QuantumCircuitIR
 from osiris_cli.providers import BaseModelProvider, get_active_provider
 from .receipts import EvaluationReceipt, PromotionPolicy
+from .falsification import AdversarialFalsificationEngine, FalsificationReceipt
 
 
 @dataclass
@@ -46,6 +47,7 @@ class GenomeCandidate:
     resource_usage_ms: float = 0.0
     provenance: str = "dnalang_evolution_loop"
     evaluation_receipt: Optional[EvaluationReceipt] = None
+    falsification_receipt: Optional[FalsificationReceipt] = None
     created_at: float = field(default_factory=time.time)
 
     def content_digest(self) -> str:
@@ -76,11 +78,13 @@ class CandidateEvolutionLoop:
         converter: Optional[OrganismConverter] = None,
         lineage_ledger_path: Optional[str] = None,
         promotion_policy: Optional[PromotionPolicy] = None,
+        falsification_engine: Optional[AdversarialFalsificationEngine] = None,
     ):
         self.provider = provider or get_active_provider()
         self.converter = converter or OrganismConverter()
         self.lineage_ledger_path = lineage_ledger_path or os.path.expanduser("~/.osiris/dnalang_lineage.jsonl")
         self.promotion_policy = promotion_policy or PromotionPolicy()
+        self.falsification_engine = falsification_engine
         self.generation_count = 0
         self.current_champion: Optional[GenomeCandidate] = None
         self.current_champion_receipt: Optional[EvaluationReceipt] = None
@@ -239,12 +243,30 @@ class CandidateEvolutionLoop:
         candidate.passed_acceptance = passed
         candidate.evaluation_receipt = receipt
 
+        # Adversarial Falsification Firewall (SYS-024)
+        falsification_passed = True
+        falsif_reason = ""
+        if self.falsification_engine is not None and passed:
+            falsif_receipt = self.falsification_engine.evaluate_candidate(
+                candidate_id=candidate.candidate_id,
+                candidate_source=candidate.genome_source,
+                candidate_metric=fitness,
+            )
+            candidate.falsification_receipt = falsif_receipt
+            if not falsif_receipt.all_controls_passed:
+                falsification_passed = False
+                falsif_reason = falsif_receipt.quarantine_notice or "Falsified by null control battery"
+
         # 8, 9 & 10. Compare with parent / baseline under PromotionPolicy (no ties, no NaN)
-        promoted, promo_reason = self.promotion_policy.evaluate_promotion(
-            candidate_receipt=receipt,
-            champion_receipt=self.current_champion_receipt,
-            expected_candidate_digest=candidate.content_digest(),
-        )
+        if falsification_passed:
+            promoted, promo_reason = self.promotion_policy.evaluate_promotion(
+                candidate_receipt=receipt,
+                champion_receipt=self.current_champion_receipt,
+                expected_candidate_digest=candidate.content_digest(),
+            )
+        else:
+            promoted = False
+            promo_reason = falsif_reason
 
         rollback_ref = parent_id or "GENESIS"
         next_gap = ""
@@ -279,6 +301,7 @@ class CandidateEvolutionLoop:
             "new_fitness": fitness,
             "promo_reason": promo_reason,
             "receipt": receipt,
+            "falsification_receipt": candidate.falsification_receipt,
             "next_gap": next_gap,
             "rollback_ref": rollback_ref,
             "generation": self.generation_count,
