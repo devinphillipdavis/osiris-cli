@@ -56,8 +56,10 @@ DISTILL_LOG = os.path.join(LIVING_HOME, "distill.jsonl")
 DEFAULT_ROOTS = [
     "docs", "organism_sim", "dnalang-core", "bridge", "osiris-governance",
     "osiris-mobile-termux", "experiments", "fold/osiris", "analysis/nclm-manifest",
+    "repos/osiris-cli/research/a_field_study", "repos/osiris-cli/research/tau_phase_erratum",
+    "repos/osiris-cli/notes", "repos/osiris-cli/papers", "repos/osiris-cli/osiris_cli/quantum",
 ]
-DEFAULT_EXTENSIONS = [".md", ".py", ".dna", ".txt", ".toml"]
+DEFAULT_EXTENSIONS = [".md", ".py", ".dna", ".txt", ".toml", ".tex"]
 EXCLUDE_DIRS = {".git", "__pycache__", ".venv", "venv", "node_modules", ".pytest_cache",
                 "results", "osiris_advantage_marrakesh", ".osiris_data", "site-packages",
                 "dist-packages", "osiris_env", "osiris-venv", "osiris-venvs", "vvenv", "osiris_deps",
