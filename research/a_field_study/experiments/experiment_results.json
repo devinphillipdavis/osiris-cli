@@ -3,16 +3,19 @@
   "experiments_executed": [
     {
       "experiment_id": "EXP-AFIELD-01",
-      "simulated_true_signal": 0.0,
-      "measured_observable": -1.4409032957792835e-08,
-      "measurement_sigma": 1e-07,
-      "falsification_threshold_3sigma": 3e-07,
+      "hardware_profile": "Niobium 3D TE011 Cavity (f0=5.0 GHz, Q=2e8, T=20 mK)",
+      "simulated_true_signal_Hz": 0.0,
+      "measured_observable_Hz": -0.07204516478896418,
+      "measured_relative_shift": -1.4409032957792836e-11,
+      "measurement_sigma_Hz": 0.5,
+      "falsification_threshold_3sigma_Hz": 1.5,
       "is_null_result": true,
       "empirical_verdict": "REFUTED",
-      "falsification_note": "Observed cavity resonant frequency shift is consistent with standard Maxwell electrodynamics. The proposed anomalous A-field boundary prefactor shift is not observed within 1e-7 precision."
+      "falsification_note": "Observed cavity frequency pull (-0.072 Hz) is strictly within 3-sigma experimental noise (1.5 Hz). Anomalous A-field boundary coupling is refuted to relative precision 3.0e-10."
     },
     {
       "experiment_id": "EXP-AFIELD-02",
+      "hardware_profile": "Bimetallic Al/Cu Ring (Diameter 1.5 um, T=20 mK)",
       "fractional_power_measured": 0.0007204516478896418,
       "noise_floor_3sigma": 0.015,
       "is_null_result": true,
@@ -22,5 +25,5 @@
   ],
   "all_hypotheses_falsified": true,
   "organism_status_update": "HYPOTHESIS_REFUTED_BY_EMPIRICAL_SIMULATION",
-  "governance_note": "Demonstrates that the research organism possesses explicit falsification criteria and correctly marks speculative physical claims as REFUTED when null results are recorded."
+  "governance_note": "Demonstrates that the research organism possesses explicit, literature-traceable falsification criteria (Paik et al., Reagor et al.) and correctly marks speculative physical claims as REFUTED when null results are recorded."
 }

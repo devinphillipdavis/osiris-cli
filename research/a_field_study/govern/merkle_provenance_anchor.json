@@ -3,12 +3,12 @@
   "grant_type": "SCIENTIFIC_RESEARCH_ORGANISM_AUDIT",
   "subject": "The Fine-Structure Constant as an A-Field Quantity: Impedance, Flux, and Prefactor Pair Structure",
   "organism_id": "alpha_a_field_study",
-  "merkle_root": "c2054980f458b4c3d26781561c3c6f75f291a88fbb3933ec2f1335d1fd794a04",
+  "merkle_root": "5d61ae0f2844b8e12391e126f621ef80d5cce2a8969aec13c0494d30373ae4c3",
   "leaf_hashes": {
     "H_source": "1b5199629924c612e30fbd0ae7b2e22cb0896e889ad0fde2b5aaf8d291e653a1",
     "H_formalize": "69fac963f46bda5f0510ea053daf59679d7c4bd67a1010c9c299e49ed5bb6184",
     "H_challenge": "fe1ee27663738ea1624f840277d14d369e16a21488f5a341abad954e521d0774",
-    "H_experiment": "56cda20f3d8f14ab7dc7aa1cdcdd42edbc2fe0529c4eeba4ea5bbbdb0dc85010"
+    "H_experiment": "801f4a1f8557bcbef53bd4c13a68f55e9b2eb7492c1f4b779c5d041bcc4a822b"
   },
   "claims_firewall_status": {
     "ALPHA-CLAIM-001": "VERIFIED_ARTIFACT",
@@ -25,6 +25,6 @@
     "GATE-04": "BLOCKED"
   },
   "governance_standard": "SYS-021 / SYS-023 / SYS-024",
-  "timestamp_utc": "2026-10-27T02:25:22.039894+00:00",
+  "timestamp_utc": "2026-10-27T02:54:44.294216+00:00",
   "status": "SEALED_QUARANTINE"
 }
