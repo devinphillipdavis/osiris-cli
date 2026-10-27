@@ -336,7 +336,8 @@ Adherence to this pre-registered execution and provenance framework guarantees p
 | Grounding | A stable brief of what is on record (pre-registered results, projects) plus per-message retrieval over your notes; answers name the file they used. | `osiris_cli/knowledge.py` |
 | Read-only checks | Code, not the model, runs checks before answering — training status, git history, exchange-ledger integrity, system load, a file you name (credential files are never read). `/check` shows them directly. | `osiris_cli/probes.py` |
 | Memory | Recent exchanges carry into the next session from the ledger (no model summarises them); `/remember` and `/forget` keep explicit facts. | `osiris_cli/living.py` |
-| Speaking gate | The core answers in its own voice only after 30 held-out exchanges at ≤ 2.0 bits/byte and below a unigram baseline. Every 5th exchange is held out and never trained on. | `osiris_cli/living.py` |
+| Speaking gate | The core answers in its own voice only after 30 held-out exchanges at ≤ 2.0 bits/byte and below a unigram baseline, both scored on every byte of the reply. Every 5th exchange is held out and never trained on. | `osiris_cli/living.py` |
+| Probe set | About 100 held-out replies, frozen once, scored whole at every 1,000-step milestone checkpoint, so learning can be told apart from a change of topic. `/train probe` scores new milestones; `/train probe freeze` draws the set. | `osiris_cli/probeset.py` |
 | Batch training | `osiris train --hours 8 --detach` trains the core on a configured corpus, chat lessons and grounded distillation; distillation pauses while you chat. | `osiris_cli/train.py` |
 | Provenance | Every exchange is appended to a SHA-256 hash chain (`~/.osiris/living/exchanges.jsonl`); `/check ledger` recomputes it. | `osiris_cli/probes.py` |
 
@@ -352,6 +353,14 @@ one trained:** scoring skipped a layer (the phase-conjugate corrector) that trai
 every block. v4.5.2 fixes that; old gate scores no longer count until `osiris train
 --rescore-only` replaces them, and whether the CRSM layers help at all is pre-registered as
 NCLM-ARCH-1 (`experiments/nclm_arch1/`). See `RELEASE_NOTES_v4.5.2.md`.
+
+**Until scorer 3 (2026-10-27) the gate read only the opening of each held-out reply:** the core
+was scored on the first two 128-byte windows (~254 bytes, mostly the mentor's formulaic opening)
+while the unigram baseline was scored on the whole reply. Amendment 4's fix (`4e42bc90`) had never
+reached `main`. Both are now scored on every byte the core predicts. On the live core's last 30
+held-out replies (step 9250) the whole reply gives 3.20 bits/byte where the first two windows gave
+2.90. Scorer-2 scores no longer count; `osiris train --rescore-only` replaces them and first keeps a
+copy of `stats.json`, whose scores trace the core's learning one exchange at a time.
 
 ## Install and run
 

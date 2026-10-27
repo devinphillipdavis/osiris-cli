@@ -45,14 +45,20 @@ OLLAMA_BASE = os.environ.get("OSIRIS_OLLAMA", "http://localhost:11434").rstrip("
 GATE_WINDOW = 30
 SPEAK_BPB = 2.0
 HELDOUT_EVERY = 5
-# Version of the forward pass that held-out scores come from, stored as a score's 5th field. Scores without
-# it (before v4.5.2) were computed with the phase-conjugate corrector skipped -- a layer the core trains with
-# in every block -- so they measure a different network: they do not count toward the gate, and
-# `osiris train --rescore-only` replaces them. A score is tagged with the SCORING_FORWARD of the osiris.nclm
-# actually loaded (NclmCore.scorer), so a stale copy of the model code cannot write a "current" score.
-SCORER = 2
+# Version of held-out scoring, stored as a score's 5th field. Only scores of the current version count toward
+# the gate; `osiris train --rescore-only` replaces the others.
+#   1  before v4.5.2: scoring skipped the phase-conjugate corrector, a layer the core trains with in every
+#      block, so these scores measure a different network.
+#   2  the v4.5.2 forward pass on the first two 128-byte windows of a reply (~254 bytes, mostly the mentor's
+#      opening), against a unigram scored on the whole reply. On the live core's last 30 held-out replies
+#      (step 9250, measured 2026-10-27): 2.90 bits/byte on those windows, 3.20 on the whole reply.
+#   3  every window of the reply, and the unigram on exactly the bytes the core predicts.
+# A score is tagged SCORER only when the loaded osiris.nclm has the forward pass SCORER is defined on (FORWARD,
+# its SCORING_FORWARD), so a stale copy of the model code cannot write a "current" score.
+SCORER = 3
+FORWARD = 2
 TRAIN_STEPS_PER_EXCHANGE = 3
-SCORE_WINDOWS = 2
+SCORE_WINDOWS = None  # held-out scoring covers the whole reply, the same bytes unigram is scored on
 HISTORY_TURNS = 12
 # One note per message: each costs ~230 tokens, and the 7B reads new tokens at ~14/s here
 # (measured 2026-10-02), so three notes alone held a reply back ~50 s. The pre-registered
@@ -67,7 +73,12 @@ CHAT_QUIET_SECONDS = 300
 MENTOR_MAX_TOKENS = int(os.environ.get("OSIRIS_MENTOR_MAX_TOKENS", "2048"))
 MENTOR_TIMEOUT = float(os.environ.get("OSIRIS_MENTOR_TIMEOUT", "180"))
 CLAIMS_PER_MESSAGE = 3          # registered claims shown before a reply
-MENTOR_NUM_CTX = int(os.environ.get("OSIRIS_MENTOR_NUM_CTX", "4096"))
+MENTOR_NUM_CTX = int(os.environ.get("OSIRIS_MENTOR_NUM_CTX", "8192"))
+# 8192 so the 2,048-token reply limit still leaves PROMPT_BUDGET (below) room for the system
+# prompt plus a full MESSAGE_BUDGET excerpt. At 4096 it did not, and a pasted document was
+# dropped from the follow-up that asked about it. Ollama's KV cache grows with num_ctx. Only
+# the /api/chat mentor here sends it; a provider voice (Gemma through Ollama's OpenAI-compatible
+# endpoint) runs at the server's context length (OLLAMA_CONTEXT_LENGTH).
 # A local 7B model on a CPU reads a few thousand tokens per minute and Ollama keeps only
 # num_ctx tokens: a 100k-character paste timed out twice (601 s, 406 s) on 2026-10-01.
 # Long messages go to the mentor as a bounded excerpt; the ledger keeps the full text.
@@ -316,6 +327,49 @@ class OllamaMentor:
 # Core voice (osiris.nclm organism)
 # ---------------------------------------------------------------------------
 
+def text_windows(text: str, span: int, limit: Optional[int] = None):
+    """Teacher-forcing (x, y) windows over text's bytes: span-byte chunks overlapping by one byte, so every byte
+    after the first is predicted once; a tail under 8 bytes is dropped. limit=None takes them all."""
+    import numpy as np
+    data = np.frombuffer(text.encode("utf-8", errors="ignore"), dtype=np.uint8).astype(np.int64)
+    out = []
+    for start in range(0, max(0, len(data) - 1), span - 1):
+        chunk = data[start:start + span]
+        if len(chunk) >= 8:
+            out.append((chunk[:-1][None, :], chunk[1:][None, :]))
+        if limit is not None and len(out) >= limit:
+            break
+    return out
+
+
+def model_bits_per_byte(model, text: str, span: int) -> Optional[float]:
+    """A held-out score: mean bits per predicted byte of text, teacher-forced, no training. The speaking gate
+    and the probe set (osiris_cli.probeset) both score through here."""
+    from osiris.nclm import cross_entropy_loss
+    from osiris.nclm.autograd import no_grad
+    total, n = 0.0, 0
+    with no_grad():
+        for x, y in text_windows(text, span, SCORE_WINDOWS):
+            total += float(cross_entropy_loss(model.forward(x), y).data) * y.shape[1]
+            n += y.shape[1]
+    return total / n / math.log(2) if n else None
+
+
+def scored_bytes(text: str, span: int) -> bytes:
+    """The bytes model_bits_per_byte predicts: all of text but its first byte (no context) and a tail under 8."""
+    return b"".join(y.astype("uint8").tobytes() for _, y in text_windows(text, span, SCORE_WINDOWS))
+
+
+def loaded_forward() -> int:
+    """SCORING_FORWARD of the osiris.nclm actually imported (1 for code without the v4.5.2 fix)."""
+    return int(getattr(sys.modules.get("osiris.nclm"), "SCORING_FORWARD", 1))
+
+
+def loaded_scorer() -> int:
+    """The version scores computed now carry: SCORER on the forward pass it is defined on, else 1 (stale)."""
+    return SCORER if loaded_forward() == FORWARD else 1
+
+
 class NclmCore:
     """OSIRIS's own model: the shared Engine 3 checkpoint, trained per exchange.
 
@@ -364,30 +418,21 @@ class NclmCore:
         with self._otc._organism_lock:
             return int(self._model()["step"])
 
-    def _windows(self, text: str, limit: int):
-        import numpy as np
-        data = np.frombuffer(text.encode("utf-8", errors="ignore"), dtype=np.uint8).astype(np.int64)
-        span = self._otc.ORGANISM_GEOMETRY["max_seq_len"]
-        out = []
-        for start in range(0, max(0, len(data) - 1), span - 1):
-            chunk = data[start:start + span]
-            if len(chunk) >= 8:
-                out.append((chunk[:-1][None, :], chunk[1:][None, :]))
-            if len(out) >= limit:
-                break
-        return out
+    def organism_dir(self) -> str:
+        return os.path.dirname(self._paths()[0])
+
+    def _span(self) -> int:
+        return self._otc.ORGANISM_GEOMETRY["max_seq_len"]
+
+    def _windows(self, text: str, limit: Optional[int]):
+        return text_windows(text, self._span(), limit)
 
     def bits_per_byte(self, text: str) -> Optional[float]:
-        from osiris.nclm import cross_entropy_loss
-        from osiris.nclm.autograd import no_grad
         with self._otc._organism_lock:
-            model = self._model()["model"]
-            total, n = 0.0, 0
-            with no_grad():
-                for x, y in self._windows(text, SCORE_WINDOWS):
-                    total += float(cross_entropy_loss(model.forward(x), y).data) * y.shape[1]
-                    n += y.shape[1]
-        return total / n / math.log(2) if n else None
+            return model_bits_per_byte(self._model()["model"], text, self._span())
+
+    def scored_bytes(self, text: str) -> bytes:
+        return scored_bytes(text, self._span())
 
     def learn(self, text: str, steps: int) -> Optional[float]:
         import random
@@ -491,21 +536,17 @@ class NclmCore:
         return sched.get_lr(opt.step_count, opt.base_lr) if sched else opt.base_lr
 
     def scorer(self) -> int:
-        """SCORING_FORWARD of the osiris.nclm this core runs on (1 for code without the v4.5.2 fix)."""
+        """The scorer version this core's scores carry (loaded_scorer)."""
         with self._otc._organism_lock:
             self._model()        # imports the model code from where the console finds it
-        return self._loaded_scorer()
-
-    @staticmethod
-    def _loaded_scorer() -> int:
-        return int(getattr(sys.modules.get("osiris.nclm"), "SCORING_FORWARD", 1))
+        return loaded_scorer()
 
     def describe(self) -> dict:
         """What a run trains: its architecture, configuration and size (recorded in run manifests)."""
         with self._otc._organism_lock:   # not reentrant: nothing below may take it again
             model = self._model()["model"]
             return {"arch": getattr(model, "organism_arch", "crsm"), "config": model.config.to_dict(),
-                    "n_params": int(model.num_parameters()), "scorer": self._loaded_scorer(),
+                    "n_params": int(model.num_parameters()), "scorer": loaded_scorer(), "forward": loaded_forward(),
                     "nclm_path": os.path.dirname(getattr(sys.modules.get("osiris.nclm"), "__file__", "") or "")}
 
     def draft(self, prompt: str, max_bytes: int = 160) -> str:
@@ -762,6 +803,7 @@ class Osiris:
         self.stats = self._load_stats()
         self.recall = self._recall()   # fixed for the session: keeps the system prompt stable
         self._pending: Optional[threading.Thread] = None
+        self._probing: Optional[threading.Thread] = None
         self._lock = threading.Lock()
         self._voices: set = set()   # mentor models this session used; finish() unloads them
         self._sent: List[Dict[str, str]] = []   # earlier turns exactly as the mentor was sent them
@@ -822,10 +864,15 @@ class Osiris:
 
     # -- the gate ----------------------------------------------------------
 
-    def unigram_bpb(self, text: str) -> float:
+    def heldout_unigram(self, reply: str) -> float:
+        """The unigram baseline on the bytes the core is scored on (the whole reply for a core that does not say)."""
+        fn = getattr(self.core, "scored_bytes", None)
+        return self.unigram_bpb(fn(reply) if callable(fn) else reply)
+
+    def unigram_bpb(self, text) -> float:
         counts = self.stats["unigram"]
         total = sum(counts.values()) + 256
-        data = text.encode("utf-8", errors="ignore")
+        data = text if isinstance(text, bytes) else text.encode("utf-8", errors="ignore")
         if not data:
             return 8.0
         nats = sum(-math.log((counts.get(str(b), 0) + 1) / total) for b in data)
@@ -848,8 +895,8 @@ class Osiris:
         if gate["open"]:
             return "gate open"
         if not gate["n"] and gate.get("stale"):
-            return (f"gate closed: {gate['stale']} held-out scores predate v4.5.2's scoring fix "
-                    "(osiris train --rescore-only)")
+            return (f"gate closed: {gate['stale']} held-out scores predate scorer {SCORER} "
+                    "(whole replies; osiris train --rescore-only)")
         if not gate["n"]:
             return "gate closed: not scored on held-out text yet"
         return (f"gate closed: {gate['core_bpb']:.2f} bits/byte on {gate['n']}/{GATE_WINDOW} held-out "
@@ -1341,19 +1388,23 @@ class Osiris:
                f"{self._core_step()}; {self.stats['exchanges']} exchanges so far, "
                f"{self.stats['core_spoke']} answered by the core itself.")
         if gate["n"]:
+            # Spelled out: a mentor read "7.20 vs 4.80 for a unigram" as an improvement (2026-10-27).
+            side = "better" if gate["core_bpb"] < gate["unigram_bpb"] else "no better"
             return who + (f"\nYour core's current state: {gate['n']} held-out exchanges scored, "
                     f"{gate['core_bpb']:.2f} bits/byte vs {gate['unigram_bpb']:.2f} for a unigram "
-                    f"baseline; it speaks on its own at <= {SPEAK_BPB} bits/byte.")
+                    f"baseline. Lower is better, so the core does {side} than the baseline; it speaks on its "
+                    f"own at <= {SPEAK_BPB} bits/byte.")
         if gate.get("stale"):
-            return who + (f"\nYour core's {gate['stale']} held-out scores were computed before a scoring fix "
-                          "(v4.5.2) and measured a different network; they are not counted until rescored.")
+            return who + (f"\nYour core's {gate['stale']} held-out scores come from an older scorer (before "
+                          "v4.5.2's fix they measured a different network; scorer 2 read only the first two "
+                          "windows of a reply); they are not counted until rescored.")
         return who + "\nYour core has not been scored on held-out conversation yet."
 
     def _after(self, lesson: str, reply: str, heldout: bool, key: str, idx: int) -> None:
         def work():
             try:
                 core_bpb = self.core.bits_per_byte(reply)
-                uni_bpb = self.unigram_bpb(reply)
+                uni_bpb = self.heldout_unigram(reply)
                 trained = False
                 if not heldout:
                     trained = self.core.learn(lesson, TRAIN_STEPS_PER_EXCHANGE) is not None
@@ -1365,6 +1416,7 @@ class Osiris:
                         for b, c in Counter(lesson.encode("utf-8", errors="ignore")).items():
                             self.stats["unigram"][str(b)] = self.stats["unigram"].get(str(b), 0) + c
                 self._save_stats()
+                self._score_probes()
             except Exception:  # noqa: BLE001 - learning must never break the conversation
                 pass
         if self.background:
@@ -1374,6 +1426,24 @@ class Osiris:
             self._pending.start()
         else:
             work()
+
+    def _score_probes(self) -> None:
+        """Score milestone checkpoints the frozen probe set has not seen, in a thread of their own: ~100 whole
+        replies take minutes on a phone, and the conversation must not wait for them."""
+        where = getattr(self.core, "organism_dir", None)
+        if not callable(where) or (self._probing is not None and self._probing.is_alive()):
+            return
+        from osiris_cli import probeset
+        if not probeset.pending(self.home, where()):
+            return
+
+        def work():
+            try:
+                probeset.score_pending(self.home, where())
+            except Exception:  # noqa: BLE001 - measurement must never break the conversation
+                pass
+        self._probing = threading.Thread(target=work, daemon=True)
+        self._probing.start()
 
     def finish(self) -> None:
         """Let the last lesson finish before the process exits, and free the
@@ -1414,8 +1484,12 @@ class Osiris:
         else:
             lines.append(f"held-out      none scored yet (every {HELDOUT_EVERY}th exchange is held out)")
         if g["stale"]:
-            lines.append(f"              {g['stale']} older scores predate the v4.5.2 scoring fix and are not "
+            lines.append(f"              {g['stale']} older scores predate scorer {SCORER} (whole replies) and are not "
                          "counted; osiris train --rescore-only rescores them")
+        from osiris_cli import probeset
+        probe = probeset.status_line(self.home)
+        if probe:
+            lines.append(probe)
         lines.append("gate          " + ("OPEN: the core answers in its own voice" if g["open"] else
                      f"closed: needs {GATE_WINDOW} held-out exchanges at <= {SPEAK_BPB} bpb and below unigram"))
         return lines
