@@ -95,3 +95,36 @@ def test_dnalang_controlled_cycle_promotion(tmp_path):
     with open(ledger) as f:
         lines = [ln for ln in f if ln.strip()]
         assert len(lines) == 3
+
+
+def test_dnalang_loop_with_falsification_engine(tmp_path):
+    """Verify that CandidateEvolutionLoop blocks promotion when falsification engine fails."""
+    from osiris_cli.dnalang import AdversarialFalsificationEngine
+
+    ledger = str(tmp_path / "dnalang_falsify_lineage.jsonl")
+    falsif_engine = AdversarialFalsificationEngine()
+
+    loop = CandidateEvolutionLoop(
+        lineage_ledger_path=ledger,
+        falsification_engine=falsif_engine,
+    )
+
+    # Candidate with fitness 0.82 (higher than baseline 0.0, but trails textbook DD baseline 0.8342)
+    def acceptance_sub_hw(ir: QuantumCircuitIR):
+        return True, 0.82
+
+    res1 = loop.run_cycle("Sub-hardware baseline candidate", acceptance_sub_hw)
+    assert res1["promoted"] is False
+    assert res1["falsification_receipt"] is not None
+    assert res1["falsification_receipt"].all_controls_passed is False
+    assert "QUARANTINE" in res1["promo_reason"]
+
+    # Candidate with fitness 0.92 (exceeds all baselines)
+    def acceptance_superior(ir: QuantumCircuitIR):
+        return True, 0.92
+
+    res2 = loop.run_cycle("Superior candidate", acceptance_superior)
+    assert res2["promoted"] is True
+    assert res2["falsification_receipt"] is not None
+    assert res2["falsification_receipt"].all_controls_passed is True
+    assert res2["generation"] == 1

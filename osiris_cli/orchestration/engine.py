@@ -10,6 +10,7 @@ Coordinates the sequential, bounded multi-agent pipeline:
 from __future__ import annotations
 
 import logging
+import os
 import time
 import uuid
 from typing import Any, Dict, List, Optional, Tuple
@@ -87,7 +88,22 @@ class GovernedAgentEngine:
                 proposal, grant, allowed_paths=self.allowed_paths
             )
 
-        # 6. Audit ledger recording
+        # 6. Governed Application (apply change only if authorized)
+        applied = False
+        apply_message = "SKIPPED_NOT_AUTHORIZED"
+        if authorized:
+            try:
+                target_path = os.path.realpath(proposal.target_file)
+                os.makedirs(os.path.dirname(target_path), exist_ok=True)
+                with open(target_path, "w", encoding="utf-8") as f:
+                    f.write(proposal.module_code)
+                applied = True
+                apply_message = f"APPLIED: Changes written to {target_path}"
+            except Exception as exc:
+                applied = False
+                apply_message = f"APPLICATION_FAILED: {exc}"
+
+        # 7. Audit ledger recording
         receipt_hash = self.memory_agent.record_event(
             event_type="governed_agent_step",
             payload={
@@ -99,6 +115,8 @@ class GovernedAgentEngine:
                 "verdict": verification.overall_verdict,
                 "authorized": authorized,
                 "auth_message": auth_message,
+                "applied": applied,
+                "apply_message": apply_message,
             },
         )
 
@@ -109,6 +127,8 @@ class GovernedAgentEngine:
             "verification": verification,
             "authorized": authorized,
             "auth_message": auth_message,
+            "applied": applied,
+            "apply_message": apply_message,
             "payload_digest": proposal.payload_digest(),
             "ledger_receipt_hash": receipt_hash,
         }
