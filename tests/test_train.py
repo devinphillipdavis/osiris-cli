@@ -172,7 +172,21 @@ def test_rescore_only_replaces_pre_fix_scores_without_training(tmp_path):
     stats = json.load(open(o.stats_path))
     assert stats["heldout_scores"][key][0] == 2.5 and stats["heldout_scores"][key][4] == train.SCORER
     assert core.batches == [] and "rescored 1 held-out exchanges" in msg
-    assert "predate v4.5.2" in msg.split("now:")[0] and "predate" not in msg.split("now:")[1]
+    assert "predate scorer 3" in msg.split("now:")[0] and "predate" not in msg.split("now:")[1]
+    kept = msg.split("kept in ")[1].rstrip(".")
+    assert json.load(open(kept))["heldout_scores"][key] == [9.9, 4.4, 0, 0]
+
+
+def test_rescore_only_replaces_first_two_window_scores(tmp_path):
+    o = Osiris(core=None, home=str(tmp_path), out=lambda s: None, background=False)
+    key = o._record({"heldout": True, "learnable": True, "voice": "mentor:x", "user": "q",
+                     "reply": "an answer long enough to score", "index": 0})
+    o.stats["heldout_scores"][key] = [2.9, 4.6, 9250, 0, 2]   # scorer 2: the reply's first two windows
+    o._save_stats()
+    assert o.gate()["n"] == 0 and o.gate()["stale"] == 1
+    train.rescore_only(FakeCore(str(tmp_path / "l")), str(tmp_path))
+    o = Osiris(core=None, home=str(tmp_path), out=lambda s: None, background=False)
+    assert o.stats["heldout_scores"][key][4] == 3 and o.gate()["stale"] == 0
 
 
 def test_archive_tier_dedupes_and_skips_third_party(tmp_path):

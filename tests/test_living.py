@@ -210,7 +210,8 @@ def test_the_mentor_is_told_why_old_scores_do_not_count(tmp_path):
 
 def test_the_package_and_the_console_agree_on_the_scorer():
     import osiris.nclm
-    assert osiris.nclm.SCORING_FORWARD == living.SCORER
+    assert osiris.nclm.SCORING_FORWARD == living.FORWARD
+    assert living.loaded_scorer() == living.SCORER == 3
 
 
 def test_new_heldout_scores_carry_the_scorer_version(tmp_path):
