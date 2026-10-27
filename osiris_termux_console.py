@@ -178,6 +178,11 @@ ORGANISM_ARCHES = {
                      pilot_wave=False, golden_scale=False, positional="standard", ff_dim=384),
 }
 ORGANISM_MAX_BACKUPS = 5
+# Every ORGANISM_MILESTONE_EVERY steps the live core keeps one checkpoint for good (organism.milestone<N>.npz:
+# the first saved at or past step N). Rotation keeps only the last ORGANISM_MAX_BACKUPS, a few hundred steps
+# apart; milestones let the frozen probe set (osiris_cli.probeset) follow the core across its whole history.
+# Experiment folders (OSIRIS_ORGANISM_HOME) keep none: each checkpoint is ~14 MB.
+ORGANISM_MILESTONE_EVERY = 0 if os.environ.get("OSIRIS_ORGANISM_HOME") else 1000
 OLLAMA_STARTUP_TIMEOUT = 2.5
 _organism_lock = threading.Lock()
 _organism_state = {"model": None, "optimizer": None, "step": 0, "history": []}
@@ -3668,6 +3673,26 @@ def _organism_save(model, optimizer, step, history, rotate=True):
     with open(meta, "w", encoding="utf-8") as f:
         json.dump({"step": step, "step_count": optimizer.step_count,
                     "history": history[-200:]}, f)
+    _organism_keep_milestone(ckpt, meta, step)
+
+
+def _organism_keep_milestone(ckpt, meta, step):
+    every = ORGANISM_MILESTONE_EVERY
+    if not every or step < every:
+        return
+    base = os.path.join(os.path.dirname(ckpt), f"organism.milestone{step // every * every}")
+    if os.path.exists(base + ".npz"):
+        return
+    try:   # the .npz appears last and whole: its presence means the milestone is complete
+        shutil.copy2(meta, base + ".json")
+        shutil.copy2(ckpt, base + ".npz.tmp")
+        os.replace(base + ".npz.tmp", base + ".npz")
+    except OSError:
+        for p in (base + ".npz.tmp", base + ".json"):
+            try:
+                os.remove(p)
+            except OSError:
+                pass
 
 
 def _organism_learn(text: str):

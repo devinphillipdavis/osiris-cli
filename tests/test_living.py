@@ -208,9 +208,18 @@ def test_the_mentor_is_told_why_old_scores_do_not_count(tmp_path):
     assert "not counted until rescored" in o._state_note(o.gate())
 
 
+def test_the_mentor_is_told_which_way_is_better(tmp_path):
+    o, _ = make(tmp_path)
+    scores(o, 7, 7.2, uni=4.8)
+    assert "Lower is better, so the core does no better than the baseline" in o._state_note(o.gate())
+    scores(o, 7, 3.2, uni=4.8)
+    assert "the core does better than the baseline" in o._state_note(o.gate())
+
+
 def test_the_package_and_the_console_agree_on_the_scorer():
     import osiris.nclm
-    assert osiris.nclm.SCORING_FORWARD == living.SCORER
+    assert osiris.nclm.SCORING_FORWARD == living.FORWARD
+    assert living.loaded_scorer() == living.SCORER == 3
 
 
 def test_new_heldout_scores_carry_the_scorer_version(tmp_path):
