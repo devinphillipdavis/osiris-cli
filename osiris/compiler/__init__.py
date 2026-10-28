@@ -13,6 +13,10 @@ from .dna_evolve import (
     FitnessMetrics, FitnessEvaluator, EvolutionaryOptimizer, EvolutionResult,
 )
 from .dna_runtime import RuntimeConfig, ExecutionResult, QuantumRuntime
+from .pec_budget import (
+    PECBudget, PECBudgetExceeded, check_pec_budget,
+    error_mass_from_layers, estimate_error_mass, estimator_options,
+)
 from .dna_ledger import LineageEntry, EvolutionLineage, QuantumLedger
 from .converter import OrganismConverter, TranslationReport
 from .backends import BackendAdapter, BackendRegistry

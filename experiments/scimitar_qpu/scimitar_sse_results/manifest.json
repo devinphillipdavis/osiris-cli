@@ -1,0 +1,210 @@
+{
+  "experiment": "Scimitar-SSE mapped angle-sweep coherence pilot",
+  "created_utc": "2026-10-27T14:56:55.687414+00:00",
+  "status": "DRY_RUN_ONLY",
+  "hypothesis": "A phase-offset control sequence near 51.843 degrees improves X-basis survival versus matched controls.",
+  "interpretation_guardrail": "This does not directly test toroidal electromagnetic geometry or physical quantum-state transfer between nodes.",
+  "lock_angle_deg_from_manuscript": 51.843,
+  "angles_deg": [
+    31.843000000000004,
+    41.843,
+    51.843,
+    61.843,
+    71.843
+  ],
+  "delays_ns": [
+    0,
+    500,
+    1000,
+    2000,
+    4000
+  ],
+  "shots_per_circuit": 2048,
+  "circuit_count": 30,
+  "circuits": [
+    {
+      "name": "free_d0ns",
+      "arm": "free",
+      "angle_deg": null,
+      "delay_ns": 0
+    },
+    {
+      "name": "xy4_a31p843_d0ns",
+      "arm": "xy4",
+      "angle_deg": 31.843000000000004,
+      "delay_ns": 0
+    },
+    {
+      "name": "xy4_a41p843_d0ns",
+      "arm": "xy4",
+      "angle_deg": 41.843,
+      "delay_ns": 0
+    },
+    {
+      "name": "xy4_a51p843_d0ns",
+      "arm": "xy4",
+      "angle_deg": 51.843,
+      "delay_ns": 0
+    },
+    {
+      "name": "xy4_a61p843_d0ns",
+      "arm": "xy4",
+      "angle_deg": 61.843,
+      "delay_ns": 0
+    },
+    {
+      "name": "xy4_a71p843_d0ns",
+      "arm": "xy4",
+      "angle_deg": 71.843,
+      "delay_ns": 0
+    },
+    {
+      "name": "free_d500ns",
+      "arm": "free",
+      "angle_deg": null,
+      "delay_ns": 500
+    },
+    {
+      "name": "xy4_a31p843_d500ns",
+      "arm": "xy4",
+      "angle_deg": 31.843000000000004,
+      "delay_ns": 500
+    },
+    {
+      "name": "xy4_a41p843_d500ns",
+      "arm": "xy4",
+      "angle_deg": 41.843,
+      "delay_ns": 500
+    },
+    {
+      "name": "xy4_a51p843_d500ns",
+      "arm": "xy4",
+      "angle_deg": 51.843,
+      "delay_ns": 500
+    },
+    {
+      "name": "xy4_a61p843_d500ns",
+      "arm": "xy4",
+      "angle_deg": 61.843,
+      "delay_ns": 500
+    },
+    {
+      "name": "xy4_a71p843_d500ns",
+      "arm": "xy4",
+      "angle_deg": 71.843,
+      "delay_ns": 500
+    },
+    {
+      "name": "free_d1000ns",
+      "arm": "free",
+      "angle_deg": null,
+      "delay_ns": 1000
+    },
+    {
+      "name": "xy4_a31p843_d1000ns",
+      "arm": "xy4",
+      "angle_deg": 31.843000000000004,
+      "delay_ns": 1000
+    },
+    {
+      "name": "xy4_a41p843_d1000ns",
+      "arm": "xy4",
+      "angle_deg": 41.843,
+      "delay_ns": 1000
+    },
+    {
+      "name": "xy4_a51p843_d1000ns",
+      "arm": "xy4",
+      "angle_deg": 51.843,
+      "delay_ns": 1000
+    },
+    {
+      "name": "xy4_a61p843_d1000ns",
+      "arm": "xy4",
+      "angle_deg": 61.843,
+      "delay_ns": 1000
+    },
+    {
+      "name": "xy4_a71p843_d1000ns",
+      "arm": "xy4",
+      "angle_deg": 71.843,
+      "delay_ns": 1000
+    },
+    {
+      "name": "free_d2000ns",
+      "arm": "free",
+      "angle_deg": null,
+      "delay_ns": 2000
+    },
+    {
+      "name": "xy4_a31p843_d2000ns",
+      "arm": "xy4",
+      "angle_deg": 31.843000000000004,
+      "delay_ns": 2000
+    },
+    {
+      "name": "xy4_a41p843_d2000ns",
+      "arm": "xy4",
+      "angle_deg": 41.843,
+      "delay_ns": 2000
+    },
+    {
+      "name": "xy4_a51p843_d2000ns",
+      "arm": "xy4",
+      "angle_deg": 51.843,
+      "delay_ns": 2000
+    },
+    {
+      "name": "xy4_a61p843_d2000ns",
+      "arm": "xy4",
+      "angle_deg": 61.843,
+      "delay_ns": 2000
+    },
+    {
+      "name": "xy4_a71p843_d2000ns",
+      "arm": "xy4",
+      "angle_deg": 71.843,
+      "delay_ns": 2000
+    },
+    {
+      "name": "free_d4000ns",
+      "arm": "free",
+      "angle_deg": null,
+      "delay_ns": 4000
+    },
+    {
+      "name": "xy4_a31p843_d4000ns",
+      "arm": "xy4",
+      "angle_deg": 31.843000000000004,
+      "delay_ns": 4000
+    },
+    {
+      "name": "xy4_a41p843_d4000ns",
+      "arm": "xy4",
+      "angle_deg": 41.843,
+      "delay_ns": 4000
+    },
+    {
+      "name": "xy4_a51p843_d4000ns",
+      "arm": "xy4",
+      "angle_deg": 51.843,
+      "delay_ns": 4000
+    },
+    {
+      "name": "xy4_a61p843_d4000ns",
+      "arm": "xy4",
+      "angle_deg": 61.843,
+      "delay_ns": 4000
+    },
+    {
+      "name": "xy4_a71p843_d4000ns",
+      "arm": "xy4",
+      "angle_deg": 71.843,
+      "delay_ns": 4000
+    }
+  ],
+  "runtime": {
+    "python": "3.13.5 (main, Aug 10 2026, 12:06:59) [GCC 14.2.0]",
+    "platform": "Linux-6.17.0-PRoot-Distro-aarch64-with-glibc2.41"
+  }
+}
