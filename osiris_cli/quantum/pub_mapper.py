@@ -23,7 +23,7 @@ from typing import Any, Dict, Iterator, List, Sequence, Tuple, Union
 
 import numpy as np
 
-from osiris_cli.journal import OperationalMerkleLedger
+from osiris_cli.journal import DEFAULT_JOURNAL_PATH, OperationalMerkleLedger
 
 
 @dataclass
@@ -435,7 +435,7 @@ class IBMPubMapper:
     def lock_to_journal(
         cls,
         receipt: ExperimentMappingReceipt,
-        journal_path: Union[str, Path] = "/root/repos/osiris-cli/provenance/osiris_operational_journal.jsonl",
+        journal_path: Union[str, Path] = DEFAULT_JOURNAL_PATH,
         grant_id: str = "GRANT-IBM-MAPPER-001",
     ) -> Dict[str, Any]:
         """
