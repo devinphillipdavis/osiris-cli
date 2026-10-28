@@ -1,0 +1,3 @@
+# OpenSSH allowed_signers: principals who may sign OSIRIS execution grants.
+# Changed only by a reviewed commit. See docs/governance/ACTION_18_APPROVAL_AUTHORITY.md.
+owner namespaces="osiris-grant" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEP/vMALwkHy6I2Mq3JNje1Lm04MnuoycVvtweVduxu2
