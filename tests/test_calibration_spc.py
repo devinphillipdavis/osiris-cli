@@ -155,12 +155,48 @@ def test_cusum_threshold_breach():
     assert report.cusum_signature.detected is True
     assert report.cusum_signature.test_statistic > 27.0
     assert report.cusum_signature.details["breach_direction"] == "upward_drift"
+    assert report.cusum_signature.details["breach_index"] > 0
     assert report.recalibration_required is True
     assert report.drift_detected is True
 
 
+def test_cusum_negative_shift_breach():
+    """Test 7: Sustained negative shift breaches downward CUSUM (S^-) threshold."""
+    validator = TimeOrderedSPCValidator(
+        cusum_config=CUSUMConfig(target_mu=0.0, slack_k=0.5, threshold_h=27.0)
+    )
+    # Sustained shift of -1.5 sigma causes S_k^- to accumulate and breach 27.0
+    runs = _generate_synthetic_runs(n=60, mean_shift=-1.5)
+
+    report = validator.audit_runs(runs)
+
+    assert report.cusum_signature.detected is True
+    assert report.cusum_signature.test_statistic > 27.0
+    assert report.cusum_signature.details["breach_direction"] == "downward_drift"
+    assert report.cusum_signature.details["breach_index"] > 0
+    assert report.recalibration_required is True
+    assert report.drift_detected is True
+
+
+def test_cusum_reset_behavior():
+    """Test 8: Transient zero-mean perturbations reset to 0 without accumulating to breach."""
+    validator = TimeOrderedSPCValidator(
+        cusum_config=CUSUMConfig(target_mu=0.0, slack_k=0.5, threshold_h=27.0)
+    )
+    # Create runs where one isolated burst (+1.0 sigma for 5 steps) occurs, then goes back to zero
+    runs = _generate_synthetic_runs(n=50, mean_shift=0.0)
+    for k in range(10, 15):
+        runs[k].observed_value += 1.0
+
+    report = validator.audit_runs(runs)
+
+    # Isolated sub-threshold burst is reset by slack_k and does not breach 27.0
+    assert report.cusum_signature.detected is False
+    assert report.cusum_signature.test_statistic < 10.0
+
+
 def test_subsystem_isolation():
-    """Test 7: Validates calibration of independent subsystems prior to system-level diagnosis."""
+    """Test 9: Validates calibration of independent subsystems prior to system-level diagnosis."""
     nominal_subsystems = {
         "dielectric_permittivity": {"drift_rate": 0.01, "tolerance": 0.05},
         "gravitational_sensor": {"drift_rate": -0.02, "tolerance": 0.05},
@@ -176,3 +212,43 @@ def test_subsystem_isolation():
     result_fail = verify_subsystem_calibrations(drifting_subsystems)
     assert result_fail["all_subsystems_calibrated"] is False
     assert result_fail["subsystems"]["dielectric_permittivity"]["calibrated"] is False
+
+
+def test_qpu_evidence_binding():
+    """Test 10: Associates observations with circuit, backend, job ID, and calibration hash.
+
+    Rule: Never infer drift from a calibration hash change alone;
+    drift must be demonstrated by statistical residual divergence.
+    """
+    validator = TimeOrderedSPCValidator()
+    runs = _generate_synthetic_runs(n=40, mean_shift=0.0)
+
+    # Assign QPU metadata with a mid-stream calibration hash change
+    for k, r in enumerate(runs):
+        r.circuit_id = f"xy4_delay_{k % 5 * 500}ns"
+        r.backend = "ibm_brisbane"
+        r.job_id = f"job_cib_{k:04d}"
+        r.calibration_hash = "cal_hash_001" if k < 20 else "cal_hash_002"
+        r.model_version = "nclm_v4.6.0"
+
+    report = validator.audit_runs(runs)
+
+    # 1. Report captures both calibration hashes and the backend
+    assert report.qpu_backends == ["ibm_brisbane"]
+    assert report.calibration_hashes == ["cal_hash_001", "cal_hash_002"]
+
+    # 2. Invariant: Hash change without residual divergence DOES NOT declare drift
+    assert report.drift_detected is False
+    assert report.recalibration_required is False
+
+    # 3. Conversely, inject true residual shift in the second session
+    runs_drift = _generate_synthetic_runs(n=40, session_shift=2.5)
+    for k, r in enumerate(runs_drift):
+        r.circuit_id = f"xy4_delay_{k % 5 * 500}ns"
+        r.backend = "ibm_brisbane"
+        r.job_id = f"job_cib_{k:04d}"
+        r.calibration_hash = "cal_hash_constant"  # Constant hash, but real drift!
+
+    report_drift = validator.audit_runs(runs_drift)
+    assert report_drift.drift_detected is True
+    assert report_drift.session_shift_signature.detected is True
