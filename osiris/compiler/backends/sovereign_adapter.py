@@ -2,9 +2,9 @@
 
 import time
 import random
-from typing import Any, Dict, Optional, Set
+from typing import Any, Dict, Set
 
-from ..dna_ir import IROpType, IROperation, QuantumCircuitIR, QuantumRegister, ClassicalRegister
+from ..dna_ir import IROpType, QuantumCircuitIR
 from ..dna_runtime import ExecutionResult
 from .base import BackendAdapter
 from .registry import BackendRegistry

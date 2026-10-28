@@ -37,6 +37,7 @@ import math
 import os
 import random
 import re
+import shutil
 import signal
 import subprocess
 import sys
@@ -55,8 +56,10 @@ DISTILL_LOG = os.path.join(LIVING_HOME, "distill.jsonl")
 DEFAULT_ROOTS = [
     "docs", "organism_sim", "dnalang-core", "bridge", "osiris-governance",
     "osiris-mobile-termux", "experiments", "fold/osiris", "analysis/nclm-manifest",
+    "repos/osiris-cli/research/a_field_study", "repos/osiris-cli/research/tau_phase_erratum",
+    "repos/osiris-cli/notes", "repos/osiris-cli/papers", "repos/osiris-cli/osiris_cli/quantum",
 ]
-DEFAULT_EXTENSIONS = [".md", ".py", ".dna", ".txt", ".toml"]
+DEFAULT_EXTENSIONS = [".md", ".py", ".dna", ".txt", ".toml", ".tex"]
 EXCLUDE_DIRS = {".git", "__pycache__", ".venv", "venv", "node_modules", ".pytest_cache",
                 "results", "osiris_advantage_marrakesh", ".osiris_data", "site-packages",
                 "dist-packages", "osiris_env", "osiris-venv", "osiris-venvs", "vvenv", "osiris_deps",
@@ -555,9 +558,12 @@ def run(core, *, hours: float, batch: int = 8, max_steps: Optional[int] = None, 
             if restored is not None:
                 log(f"restored the best held-out checkpoint (step {restored}, {best['bpb']:.3f} bpb); "
                     f"the final weights ({last['heldout_docs_bpb']:.3f} bpb) stay in the rotated backups")
+        kept = keep_copy(os.path.join(living_home, "stats.json")) if rescore else None
         rescored = rescore_chat(core, living_home) if rescore else 0
+        probed = score_probes(core, living_home, log) if rescore else 0
         summary = {"kind": "end", "reason": reason, "steps": steps, "core_step_end": core.step(),
                    "hours": round((time.time() - t0) / 3600, 3), "rescored_heldout_exchanges": rescored,
+                   "stats_kept": kept, "probe_checkpoints_scored": probed,
                    "start": first, "end": last, "best": best, "restored_best_step": restored}
         progress(summary)
         try:
@@ -586,7 +592,7 @@ def rescore_chat(core, living_home: str) -> int:
         bpb = core.bits_per_byte(r["reply"])
         if bpb is None:
             continue
-        o.stats["heldout_scores"][r["hash"]] = [round(bpb, 4), round(o.unigram_bpb(r["reply"]), 4),
+        o.stats["heldout_scores"][r["hash"]] = [round(bpb, 4), round(o.heldout_unigram(r["reply"]), 4),
                                                 step, int(r.get("index", 0)), scorer]
         n += 1
     o._save_stats()
@@ -601,16 +607,42 @@ def rescore_only(core, living_home: str, warn_open_chat: bool = True) -> str:
         return (f"not rescored: the loaded osiris.nclm ({os.path.dirname(where)}) scores as version {scorer}, "
                 f"not {SCORER} -- an older copy of the model code (check PYTHONPATH); its scores would not "
                 "count toward the gate")
-    before = Osiris(core=core, home=living_home, out=lambda s: None, background=False).gate()
+    o = Osiris(core=core, home=living_home, out=lambda s: None, background=False)
+    before = o.gate()
+    kept = keep_copy(o.stats_path)
     n = rescore_chat(core, living_home)
     after = Osiris(core=core, home=living_home, out=lambda s: None, background=False)
     g = after.gate()
     left = (f" {g['stale']} older scores have no rescorable exchange in the ledger and stay uncounted."
             if g["stale"] else "")
-    note = (" A console still open from before v4.5.2 can write old scores back: restart it."
+    note = (" A console still running older code can write older scorers' scores back: restart it."
             if warn_open_chat and chat_active(living_home) else "")
+    kept = f" The scores it replaced are kept in {kept}." if kept else ""
     return (f"rescored {n} held-out exchanges at step {core.step()} (scorer {scorer}); "
-            f"before: {Osiris.gate_note(before)}; now: {Osiris.gate_note(g)}.{left}{note}")
+            f"before: {Osiris.gate_note(before)}; now: {Osiris.gate_note(g)}.{left}{note}{kept}")
+
+
+def keep_copy(path: str) -> Optional[str]:
+    """Copy stats.json aside before a rescore replaces its scores: each held-out score was taken with the weights
+    the core had when the exchange arrived, and that learning curve exists nowhere else."""
+    if not os.path.exists(path):
+        return None
+    dest = f"{path}.before-rescore-{time.strftime('%Y%m%dT%H%M%S')}"
+    shutil.copy2(path, dest)
+    return dest
+
+
+def score_probes(core, living_home: str, log: Callable[[str], None] = lambda s: None) -> int:
+    """Score the milestone checkpoints not yet scored on the frozen probe set (osiris_cli.probeset)."""
+    where = getattr(core, "organism_dir", None)
+    if not callable(where):
+        return 0
+    from osiris_cli import probeset
+    try:
+        return len(probeset.score_pending(living_home, where(), log))
+    except Exception as e:  # noqa: BLE001 - a run's end (lock release, summary) must not depend on it
+        log(f"probe set not scored: {e}")
+        return 0
 
 
 # ---------------------------------------------------------------------------
@@ -716,8 +748,8 @@ def main(argv: Optional[List[str]] = None) -> None:
                          "(sampled at archive_share; third-party code, venvs and backups excluded)")
     ap.add_argument("--rescore-only", action="store_true",
                     help="score every held-out exchange with the current weights for the speaking gate, "
-                         "without training (after upgrading to v4.5.2: older scores measured a different "
-                         "network and are not counted)")
+                         "without training (after an upgrade that changes the scorer -- v4.5.2's forward "
+                         "fix, scorer 3's whole replies -- older scores are not counted)")
     ap.add_argument("--detach", action="store_true", help="run in the background and return")
     ap.add_argument("--status", action="store_true")
     ap.add_argument("--stop", action="store_true")

@@ -6,7 +6,6 @@ import os
 import re
 from typing import Any, Dict, List, Optional
 from dataclasses import dataclass
-from pathlib import Path
 
 
 @dataclass
@@ -58,7 +57,7 @@ class DeveloperTools:
             with open(fp, "r") as f:
                 content = f.read()
             lines = content.split("\n")
-            loc = len([l for l in lines if l.strip() and not l.strip().startswith("#")])
+            loc = len([ln for ln in lines if ln.strip() and not ln.strip().startswith("#")])
             functions = len(re.findall(r"^\s*def ", content, re.MULTILINE))
             classes = len(re.findall(r"^\s*class ", content, re.MULTILINE))
             return CodeAnalysisResult(

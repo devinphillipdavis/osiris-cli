@@ -17,8 +17,11 @@ def setup_gemma_env():
     """Ensure Gemma mock provider is active for console tests."""
     reset_active_provider()
     os.environ["OSIRIS_MODEL_PROVIDER"] = "gemma"
+    os.environ["OSIRIS_GEMMA_MOCK"] = "1"
     prov = get_active_provider(mode="mock", model="gemma-3-1b")
     yield prov
+    os.environ.pop("OSIRIS_GEMMA_MOCK", None)
+    os.environ.pop("OSIRIS_MODEL_PROVIDER", None)
     reset_active_provider()
 
 

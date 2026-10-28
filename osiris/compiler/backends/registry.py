@@ -1,6 +1,6 @@
 """Backend registry — discover, register, and retrieve adapters."""
 
-from typing import Dict, List, Optional, Type
+from typing import Dict, List
 
 from .base import BackendAdapter
 
@@ -47,17 +47,17 @@ class BackendRegistry:
     @classmethod
     def _auto_discover(cls) -> None:
         """Import built-in adapter modules so they self-register."""
-        from . import sovereign_adapter  # always available
+        from . import sovereign_adapter  # noqa: F401  (self-registers)  -- always available
         try:
-            from . import qiskit_adapter
+            from . import qiskit_adapter  # noqa: F401  (self-registers)
         except Exception:
             pass
         try:
-            from . import cirq_adapter
+            from . import cirq_adapter  # noqa: F401  (self-registers)
         except Exception:
             pass
         try:
-            from . import pyquil_adapter
+            from . import pyquil_adapter  # noqa: F401  (self-registers)
         except Exception:
             pass
 

@@ -18,7 +18,7 @@ import time
 import numpy as np
 from typing import Dict, Optional, List
 
-from osiris.nclm.autograd import Tensor, cross_entropy_loss, no_grad
+from osiris.nclm.autograd import cross_entropy_loss, no_grad
 from osiris.nclm.transformer import SovereignTransformer
 
 

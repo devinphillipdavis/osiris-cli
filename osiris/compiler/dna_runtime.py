@@ -8,6 +8,11 @@ from typing import Any, Dict, List, Optional
 from dataclasses import dataclass, field
 
 from .dna_ir import QuantumCircuitIR
+from .pec_budget import (
+    DEFAULT_MAX_OVERHEAD, PECBudget, PECBudgetExceeded,
+    check_pec_budget, error_mass_from_layers, estimate_error_mass,
+    estimator_options,
+)
 
 
 @dataclass
@@ -17,9 +22,14 @@ class RuntimeConfig:
     use_simulator: bool = False
     shots: int = 1024
     optimization_level: int = 3
-    resilience_level: int = 1
+    resilience_level: int = 1  # Estimator only; Sampler has no resilience levels
     max_execution_time: int = 3600
     allow_mock: bool = False
+    # PEC is checked against its sampling-overhead cap before anything runs.
+    pec_mitigation: bool = False
+    pec_max_overhead: float = DEFAULT_MAX_OVERHEAD
+    pec_allow_partial: bool = False
+    gate_error_rates: Optional[Dict[str, float]] = None
 
     def __post_init__(self):
         if not self.ibm_token:
@@ -65,12 +75,19 @@ class QuantumRuntime:
         self.config = config or RuntimeConfig()
         self.execution_log: List[ExecutionResult] = []
 
-    def execute(self, circuit: QuantumCircuitIR) -> ExecutionResult:
+    def execute(self, circuit: QuantumCircuitIR,
+                layer_rates: Optional[List[List[float]]] = None) -> ExecutionResult:
         """Execute a circuit using the configured backend.
 
         Mock execution is available only when explicitly enabled in the
         configuration, so backend failures cannot be mistaken for results.
+        With PEC enabled, an over-budget circuit raises PECBudgetExceeded
+        before any backend (or the mock) is touched.
         """
+        if self.config.pec_mitigation:
+            budget = self.pec_budget(circuit, layer_rates)
+            if not budget.within_budget:
+                raise PECBudgetExceeded(budget)
         t0 = time.time()
         try:
             from .backends.registry import BackendRegistry
@@ -85,6 +102,33 @@ class QuantumRuntime:
         result.execution_time = time.time() - t0
         self.execution_log.append(result)
         return result
+
+    def pec_budget(self, circuit: QuantumCircuitIR,
+                   layer_rates: Optional[List[List[float]]] = None) -> PECBudget:
+        """PEC sampling-overhead check for this circuit under the configured cap.
+
+        Learned Pauli-Lindblad rates (one list per executed layer) give the
+        exact error mass; without them it is estimated from
+        ``config.gate_error_rates``.
+        """
+        if layer_rates is not None:
+            error_mass = error_mass_from_layers(layer_rates)
+        elif self.config.gate_error_rates is not None:
+            error_mass = estimate_error_mass(circuit, self.config.gate_error_rates)
+        else:
+            raise ValueError(
+                "PEC budget needs learned layer rates or RuntimeConfig.gate_error_rates"
+            )
+        return check_pec_budget(error_mass, self.config.shots,
+                                self.config.pec_max_overhead,
+                                self.config.pec_allow_partial)
+
+    def estimator_options(self, circuit: QuantumCircuitIR,
+                          layer_rates: Optional[List[List[float]]] = None) -> Dict[str, Any]:
+        """EstimatorV2 options: the configured resilience_level, plus PEC
+        settings when PEC is enabled and the circuit passes its budget check."""
+        budget = self.pec_budget(circuit, layer_rates) if self.config.pec_mitigation else None
+        return estimator_options(self.config.resilience_level, self.config.shots, budget)
 
     @staticmethod
     def _ir_to_qiskit(circuit: QuantumCircuitIR):

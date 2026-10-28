@@ -1,0 +1,126 @@
+{
+  "organism_id": "alpha_a_field_study",
+  "organism_type": "research_genome",
+  "framework": "dna::}{::lang",
+  "version": "1.0.0",
+  "source": {
+    "document": "The Fine-Structure Constant as an A-Field Quantity: Impedance, Flux, and the Pair Structure of Its Prefactor",
+    "date": "2026-10-12",
+    "integrity": "epistemic_audit_active"
+  },
+  "governance": {
+    "models_propose": true,
+    "automated_promotion": false,
+    "human_review_required": true,
+    "firewall_standard": "SYS-024",
+    "authorization_standard": "SYS-021",
+    "evidence_standard": "SYS-023",
+    "epistemic_invariant": "A verified identity is not a verified interpretation; a verified interpretation is not a derived physical law; and a derived law is not an independently confirmed prediction until the relevant evidence exists."
+  },
+  "claims": [
+    {
+      "id": "ALPHA-CLAIM-001",
+      "statement": "alpha = Z0 / (2 * RK) = (1/4) * G0 * Z0 = (e * Z0) / (4 * Phi0) = (h * Z0) / (8 * Phi0^2)",
+      "category": "MATHEMATICAL_IDENTITY",
+      "epistemic_tier": 1,
+      "standing": "ARTIFACT",
+      "firewall_status": "VERIFIED",
+      "verification_method": "symbolic_and_numeric_dimensional_audit",
+      "tolerance": 1e-15,
+      "gate_dependency": "GATE-01"
+    },
+    {
+      "id": "ALPHA-CLAIM-002",
+      "statement": "The prefactor follows the bookkeeping rule: prefactor = (1/2) * (1/2)^n where n counts pairing factors in the chosen representation",
+      "category": "REPRESENTATION_ACCOUNTING",
+      "epistemic_tier": 2,
+      "standing": "SUPPORTED",
+      "firewall_status": "VERIFIED",
+      "verification_method": "algebraic_combinatorics",
+      "gate_dependency": "GATE-01"
+    },
+    {
+      "id": "ALPHA-CLAIM-003",
+      "statement": "The invariant prefactor factor of 1/2 physically represents an outgoing-and-returning A-field pair",
+      "category": "PHYSICAL_INTERPRETATION",
+      "epistemic_tier": 4,
+      "standing": "HYPOTHESIS",
+      "firewall_status": "MODEL_PROPOSED",
+      "quarantined": true,
+      "verification_method": "derive_from_A_field_equations",
+      "gate_dependency": "GATE-02"
+    },
+    {
+      "id": "ALPHA-CLAIM-004",
+      "statement": "The A-field formulation explains the scale-dependence (running coupling) of alpha(Q^2)",
+      "category": "OPEN_PHYSICAL_THEORY",
+      "epistemic_tier": 4,
+      "standing": "NOT_MEASURED",
+      "firewall_status": "QUARANTINED",
+      "quarantined": true,
+      "verification_method": "qed_renormalization_group_flow_matching",
+      "gate_dependency": "GATE-03"
+    },
+    {
+      "id": "ALPHA-CLAIM-005",
+      "statement": "Derive the numerical magnitude of alpha (~1/137.0359992) from independent first principles",
+      "category": "OPEN_PHYSICAL_THEORY",
+      "epistemic_tier": 4,
+      "standing": "NOT_MEASURED",
+      "firewall_status": "QUARANTINED",
+      "quarantined": true,
+      "verification_method": "first_principles_ab_initio_derivation",
+      "gate_dependency": "GATE-04"
+    },
+    {
+      "id": "ALPHA-CLAIM-006",
+      "statement": "Geometric equality 4*pi*r^2 = (2*pi*r)*(2*r) directly implies physical electromagnetic field pair generation",
+      "category": "SPECULATIVE_METAPHOR",
+      "epistemic_tier": 4,
+      "standing": "OVERCLAIM",
+      "firewall_status": "QUARANTINED",
+      "quarantined": true,
+      "verification_method": "falsifiable_experimental_distinction",
+      "gate_dependency": "GATE-04"
+    }
+  ],
+  "gates": [
+    {
+      "gate_id": "GATE-01",
+      "name": "Symbolic, Dimensional & Numerical Verification of Identities",
+      "type": "AUTOMATED_HERMETIC_CHECK",
+      "status": "PASS",
+      "criteria": "Exact algebraic reduction, SI unit consistency, and CODATA 2022 precision check within 1e-15",
+      "blocking": false
+    },
+    {
+      "gate_id": "GATE-02",
+      "name": "Microscopic Field-Pair Derivation from A-Field Equations",
+      "type": "THEORETICAL_DERIVATION_AUDIT",
+      "status": "BLOCKED",
+      "criteria": "Rigorous derivation of the 1/2 factor from Maxwell/Proca Lagrangian with explicit gauge and boundary conditions",
+      "blocking": true
+    },
+    {
+      "gate_id": "GATE-03",
+      "name": "QED Scale Dependence & Running Coupling Recovery",
+      "type": "RENORMALIZATION_CONSISTENCY_AUDIT",
+      "status": "BLOCKED",
+      "criteria": "Demonstrate agreement with running alpha(Q^2) from QED vacuum polarization and specify novel physical delta",
+      "blocking": true
+    },
+    {
+      "gate_id": "GATE-04",
+      "name": "Independent Quantitative Prediction & Falsification",
+      "type": "EMPIRICAL_FALSIFIABILITY_GATE",
+      "status": "BLOCKED",
+      "criteria": "Make a distinct numerical prediction subject to experimental falsification without inserting measured alpha",
+      "blocking": true
+    }
+  ],
+  "lineage": {
+    "parent_commit": "23b96839",
+    "author": "Devin Phillip Davis",
+    "organization": "Agile Defense Systems LLC"
+  }
+}

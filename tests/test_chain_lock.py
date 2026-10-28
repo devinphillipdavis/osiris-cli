@@ -12,6 +12,7 @@ from osiris_cli import chain_lock
 from osiris_cli.probes import verify_chain
 
 GENESIS = "0" * 64
+FIXTURE_LEDGER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures", "dnalang_ledger_v0_2_0.py")
 
 
 def _exchange_entry(i):
@@ -98,14 +99,40 @@ def test_learning_ledger_chains_and_blocks_on_a_torn_tail(tmp_path):
         paste_learning.append_learning_ledger(home, "C", {})
 
 
-def test_lineage_agent_chains(tmp_path):
+def _genome_ledger_module(monkeypatch):
+    """genome_ledger, falling back to the pinned dnalang ledger.py when dnalang-core is absent."""
+    import genome_ledger as gl
+
+    if not os.path.exists(gl.LEDGER_SRC):
+        monkeypatch.setattr(gl, "LEDGER_SRC", FIXTURE_LEDGER)
+        monkeypatch.setattr(gl, "_ledger_mod", None)
+    return gl
+
+
+def test_lineage_agent_chains(tmp_path, monkeypatch):
     from osiris_cli.orchestration.agents import MemoryLineageAgent
 
+    gl = _genome_ledger_module(monkeypatch)
     agent = MemoryLineageAgent(str(tmp_path / "genome_ledger.jsonl"))
     h1 = agent.record_event("X", {"a": 1})
+    gl.GenomeLedger(agent.ledger_file).append("file_change", {"path": "f.py"})
     agent.record_event("Y", {})
     rows = [json.loads(ln) for ln in open(agent.ledger_file)]
-    assert rows[1]["prev_hash"] == h1
+    assert [r["kind"] for r in rows] == ["X", "file_change", "Y"]
+    assert rows[1]["prev"] == h1 and rows[2]["prev"] == rows[1]["hash"]
+    assert gl.GenomeLedger(agent.ledger_file).verify()
+
+
+def test_lineage_agent_writes_nothing_without_dnalang(tmp_path, monkeypatch):
+    import genome_ledger as gl
+    from osiris_cli.orchestration.agents import MemoryLineageAgent
+
+    monkeypatch.setattr(gl, "LEDGER_SRC", str(tmp_path / "missing" / "ledger.py"))
+    monkeypatch.setattr(gl, "_ledger_mod", None)
+    agent = MemoryLineageAgent(str(tmp_path / "genome_ledger.jsonl"))
+    with pytest.raises(FileNotFoundError):
+        agent.record_event("X", {"a": 1})
+    assert not os.path.exists(agent.ledger_file)
 
 
 def test_gemini_ledger_still_verifies(tmp_path):

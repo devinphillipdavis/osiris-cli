@@ -1,0 +1,29 @@
+{
+  "organism_id": "tau_phase_erratum_study",
+  "evaluation_battery": {
+    "test_1_claims_refutation_integrity": {
+      "description": "Assert that theta_lock, K8_revival, and F_max are formally classified as REFUTED",
+      "verdict": "PASS",
+      "claims_audited": [
+        "THETA_LOCK",
+        "K8_REVIVAL",
+        "F_MAX",
+        "LAMBDA_PHI"
+      ]
+    },
+    "test_2_operational_recovery_lock": {
+      "description": "Assert that operational_allowed is strictly False (SYS-024 fail-closed gate)",
+      "verdict": "PASS",
+      "operational_allowed": false
+    },
+    "test_3_active_invariant_preservation": {
+      "description": "Assert that genuine physical invariants (Gamma_floor = 0.0920) remain enforced",
+      "verdict": "PASS",
+      "coherence_floor": 0.092,
+      "planck_mass_kg": 2.176435e-08
+    }
+  },
+  "all_governance_tests_passed": true,
+  "organism_maturity_verdict": "ERRATUM_GOVERNANCE_INTEGRITY_PROVEN",
+  "merkle_anchor": "7e8f20c2e0ce1ca12584a884b9f3b0a741936090a0ac36b2ae10a176673f5713"
+}

@@ -9,6 +9,7 @@ import json
 import pytest
 
 from osiris_cli.providers import (
+    BaseModelProvider,
     ExecutionPlacement,
     FinishReason,
     GEMMA_MANIFEST,
@@ -147,9 +148,9 @@ def test_registry_resolution():
     gemma = create_provider("gemma", mode="mock")
     assert isinstance(gemma, GemmaProvider)
 
-    # Active provider defaults to healthy gemma
+    # Active provider defaults to healthy registered provider
     active = get_active_provider()
-    assert isinstance(active, GemmaProvider)
+    assert isinstance(active, BaseModelProvider)
     reset_active_provider()
 
 

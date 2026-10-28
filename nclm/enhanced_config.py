@@ -4,7 +4,7 @@ import json
 import time
 import hashlib
 import numpy as np
-from typing import Dict, List, Optional, Tuple, Any, Set
+from typing import Dict, List, Optional, Tuple, Set
 from dataclasses import dataclass, field
 from enum import Enum, auto
 import logging
@@ -394,7 +394,6 @@ Quantum Entanglement: {self.config.cognitive_params.quantum_entanglement}""")
         # This is a simplified interpretation - real implementation would be more sophisticated
 
         outcome = measurement["outcome"]
-        probs = measurement["probabilities"]
 
         # Generate a cognitive interpretation based on the quantum state
         interpretations = [

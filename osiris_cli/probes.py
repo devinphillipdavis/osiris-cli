@@ -77,6 +77,60 @@ def verify_chain(path: str) -> Dict[str, object]:
     return {"entries": n, "intact": broken is None, "broken_at": broken, "forks": forks, "head": prev[:12]}
 
 
+def verify_chain_tail(path: str, tail_lines: int = 20) -> Dict[str, object]:
+    """Fast incremental verification of the last N entries of the ledger.
+    Reads only the tail bytes under seek/tail semantics, verifying
+    internal cryptographic consistency and hash chaining in O(1) time.
+    """
+    import hashlib
+    if not os.path.exists(path):
+        return {"tail_count": 0, "intact": True, "head": "0" * 12}
+
+    lines = []
+    try:
+        with open(path, "rb") as f:
+            f.seek(0, os.SEEK_END)
+            size = f.tell()
+            buffer_size = min(size, max(tail_lines * 8192, 65536))
+            f.seek(size - buffer_size, os.SEEK_SET)
+            chunk = f.read().decode("utf-8", errors="replace")
+            all_lines = [ln for ln in chunk.splitlines() if ln.strip()]
+            lines = all_lines[-tail_lines:]
+    except Exception as e:
+        return {"tail_count": 0, "intact": False, "error": str(e)}
+
+    if not lines:
+        return {"tail_count": 0, "intact": True, "head": "0" * 12}
+
+    intact = True
+    prev_hash = None
+    last_head = None
+
+    for i, line in enumerate(lines):
+        try:
+            entry = json.loads(line)
+            h = entry.pop("hash", None)
+            body = json.dumps(entry, sort_keys=True, ensure_ascii=False)
+            calc = hashlib.sha256(body.encode()).hexdigest()
+            if calc != h:
+                intact = False
+                break
+            if prev_hash is not None and entry.get("prev") != prev_hash:
+                intact = False
+                break
+            prev_hash = h
+            last_head = h
+        except Exception:
+            intact = False
+            break
+
+    return {
+        "tail_count": len(lines),
+        "intact": intact,
+        "head": (last_head[:12] if last_head else "0" * 12),
+    }
+
+
 def safe_path(raw: str, base: str = HOME) -> Optional[str]:
     """A readable text file under the home directory that is not a secret."""
     p = os.path.realpath(os.path.expanduser(raw if raw.startswith(("~", "/")) else os.path.join(base, raw)))
